@@ -71,8 +71,8 @@ async function runSpike(): Promise<void> {
     console.log(`[${i + 1}/${TEST_QUESTIONS.length}] Q: "${question}"`)
 
     try {
-      // Small delay to avoid 503 rate limiting on rapid sequential requests
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Delay to avoid 503 rate limiting on rapid sequential requests
+      await new Promise(resolve => setTimeout(resolve, 5000))
 
       const result = await model.generateContent(buildPrompt(question))
       const raw    = result.response.text().trim()
