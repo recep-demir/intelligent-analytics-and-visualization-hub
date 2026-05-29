@@ -33,11 +33,15 @@ Product.init(
   }
 );
 
-extendTypes({
-  Query: {
-    products: {
-      resolver: 'default',
-      returnType: '[Product!]',
+try {
+  extendTypes({
+    Query: {
+      products: {
+        resolver: 'default',
+        returnType: '[Product!]',
+      },
     },
-  },
-});
+  });
+} catch (error) {
+  console.warn('⚠️ Failed to extend GraphQL types:', error);
+}
