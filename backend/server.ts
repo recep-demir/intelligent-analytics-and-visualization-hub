@@ -1,4 +1,4 @@
-import './patch'; // 🛡️ DİKKAT: BU SATIR KESİNLİKLE EN ÜSTTE OLMALI!
+import './patch'; 
 
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
