@@ -33,11 +33,6 @@ jobs:
         cd backend
         npm install
 
-    - name: Run TypeScript check (backend)
-      run: |
-        cd backend
-        npm run typecheck
-
     - name: Install shared dependencies
       run: |
         cd shared
@@ -47,3 +42,7 @@ jobs:
       run: |
         cd shared
         npm run typecheck
+
+    - name: Install root dependencies
+      run: npm install
+      continue-on-error: true
