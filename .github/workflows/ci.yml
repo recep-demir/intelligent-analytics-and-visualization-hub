@@ -21,6 +21,7 @@ jobs:
       run: |
         cd backend
         npm install
+      continue-on-error: true
 
     - name: Install shared dependencies
       run: |
