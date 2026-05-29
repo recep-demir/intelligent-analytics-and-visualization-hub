@@ -22,7 +22,7 @@ async function verifyDatabaseConnection(): Promise<void> {
         );
 
         console.log('Available database tables:');
-        tables.forEach((table) => {
+        tables.forEach((table: SqliteTable) => {
             console.log(` - ${table.name}`);
         });
 
