@@ -11,6 +11,8 @@ async function startGraphQLServer(): Promise<void> {
     await sequelize.authenticate();
     console.log('✅ Database connection established via Sequelize.');
 
+    await sequelize.sync({ alter: true });
+
     const { typeDefs, resolvers } = generateSchema({
       plugins: [pluginSequelize()],
       types: { Product }, 
