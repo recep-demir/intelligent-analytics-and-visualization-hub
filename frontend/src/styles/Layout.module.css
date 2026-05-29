@@ -1,0 +1,28 @@
+.dashboardContainer {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+  background-color: #f3f4f6;
+  font-family: system-ui, -apple-system, sans-serif;
+  margin: 0;
+}
+
+.sidebar {
+  background-color: #1e293b;
+  color: #f8fafc;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebarTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: #38bdf8;
+}
+
+.mainContent {
+  padding: 2.5rem;
+  color: #0f172a;
+}
