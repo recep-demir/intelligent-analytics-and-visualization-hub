@@ -11,7 +11,15 @@ async function startGraphQLServer(): Promise<void> {
     await sequelize.authenticate();
     console.log('✅ Database connection established via Sequelize.');
 
-    await sequelize.sync({ alter: true });
+
+    await sequelize.query('PRAGMA foreign_keys = OFF;');
+
+    await sequelize.sync();
+    
+
+    await sequelize.query('PRAGMA foreign_keys = ON;');
+    console.log('✅ Database schemas synchronized.');
+
 
     const { typeDefs, resolvers } = generateSchema({
       plugins: [pluginSequelize()],
