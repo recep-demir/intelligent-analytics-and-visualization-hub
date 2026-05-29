@@ -11,8 +11,8 @@ export interface JWTPayload {
   userId: number
   email:  string
   role:   Role
-  iat:    number
-  exp:    number
+  iat:    number   // issued at — set automatically by JWT library
+  exp:    number   // expires at — set automatically by JWT library
 }
 
 export interface LoginRequest {

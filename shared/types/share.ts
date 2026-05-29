@@ -4,7 +4,7 @@ export interface ShareLink {
   id:          number
   uuid:        string
   queryConfig: ChartConfig
-  createdBy:   number
+  createdBy:   number   // user id
   createdAt:   number
 }
 
