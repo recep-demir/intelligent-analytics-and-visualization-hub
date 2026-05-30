@@ -1,11 +1,29 @@
+/**
+ * SDL Spike — proof of concept, not production code.
+ * Goal: verify Gemini 2.5 Flash can read a GraphQL schema (SDL) and convert
+ * plain-English questions into valid ChartConfig JSON.
+ * Result feeds Timnit's AI engine decision in S2.
+ */
+import * as path from 'path'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import * as dotenv from 'dotenv'
 import { ChartConfig } from '../../../../shared/types/chart'
 
-dotenv.config({ path: '../.env' })
+// Absolute path — works regardless of which directory the script is run from
+// spike/ → ai/ → src/ → backend/ → project root
+dotenv.config({ path: path.join(__dirname, '../../../../.env') })
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+// Explicit API key validation with a clear error message
+const apiKey = process.env.GEMINI_API_KEY
+if (!apiKey) {
+  console.error('❌ GEMINI_API_KEY not set in .env')
+  process.exit(1)
+}
+
+const genAI = new GoogleGenerativeAI(apiKey)
 const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+const REQUEST_TIMEOUT_MS = 30_000
 
 // Flattened view — Orders JOIN Addresses, pre-processed for tax analytics
 const SCHEMA_SDL = `
@@ -24,7 +42,6 @@ type TaxRecord {
 }
 `
 
-// Test questions — simple to complex, covering all chart types
 const TEST_QUESTIONS = [
   'Show me total tax collected by province as a bar chart',
   'Show me tax revenue trends by year as a line chart',
@@ -59,6 +76,13 @@ Return ONLY valid JSON — no explanation, no markdown fences:
 }`
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  )
+  return Promise.race([promise, timeout])
+}
+
 async function runSpike(): Promise<void> {
   console.log('=== SDL Spike — Gemini 2.5 Flash ===')
   console.log(`Schema: TaxRecord (Orders + Addresses flattened view)`)
@@ -71,13 +95,13 @@ async function runSpike(): Promise<void> {
     console.log(`[${i + 1}/${TEST_QUESTIONS.length}] Q: "${question}"`)
 
     try {
-      // Delay to avoid 503 rate limiting on rapid sequential requests
       await new Promise(resolve => setTimeout(resolve, 5000))
 
-      const result = await model.generateContent(buildPrompt(question))
+      const result = await withTimeout(
+        model.generateContent(buildPrompt(question)),
+        REQUEST_TIMEOUT_MS
+      )
       const raw    = result.response.text().trim()
-
-      // Strip markdown code fences if Gemini wraps the response
       const json   = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim()
       const config = JSON.parse(json) as ChartConfig
 
@@ -85,8 +109,8 @@ async function runSpike(): Promise<void> {
       console.log(JSON.stringify(config, null, 2))
       passed++
     } catch (err) {
-      console.log('❌ Failed to parse response')
-      console.log(err)
+      console.log('❌ Failed')
+      console.log(err instanceof Error ? err.message : err)
       failed++
     }
 
@@ -95,7 +119,7 @@ async function runSpike(): Promise<void> {
 
   console.log(`\n=== Results: ${passed}/${TEST_QUESTIONS.length} passed ===`)
   console.log(passed === TEST_QUESTIONS.length
-    ? '✅ Gemini understands the schema — proceed with GPT-4o/Gemini engine'
+    ? '✅ Gemini understands the schema — proceed with Gemini engine'
     : `⚠️  ${failed} questions failed — review and consider local rule-based fallback`
   )
 }
