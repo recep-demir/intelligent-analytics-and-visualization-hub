@@ -6,35 +6,36 @@ import { sequelize, Product } from './models';
 import { generateSchema } from 'graphql-gene';
 import { pluginSequelize } from '@graphql-gene/plugin-sequelize';
 
-async function startGraphQLServer(): Promise<void> {
+
+export async function createApolloServer() {
+  await sequelize.authenticate();
+  
+  await sequelize.query('PRAGMA foreign_keys = OFF;');
+  await sequelize.sync();
+  await sequelize.query('PRAGMA foreign_keys = ON;');
+
+  const { typeDefs, resolvers } = generateSchema({
+    plugins: [pluginSequelize()],
+    types: { Product }, 
+  });
+
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+  });
+
+  return server;
+}
+
+export async function startGraphQLServer(): Promise<void> {
   try {
-    await sequelize.authenticate();
-    console.log('✅ Database connection established via Sequelize.');
-
-
-    await sequelize.query('PRAGMA foreign_keys = OFF;');
-
-    await sequelize.sync();
+    const server = await createApolloServer();
     
-
-    await sequelize.query('PRAGMA foreign_keys = ON;');
-    console.log('✅ Database schemas synchronized.');
-
-
-    const { typeDefs, resolvers } = generateSchema({
-      plugins: [pluginSequelize()],
-      types: { Product }, 
-    });
-
-    const server = new ApolloServer({
-      typeDefs,
-      resolvers,
-    });
-
     const { url } = await startStandaloneServer(server, {
       listen: { port: 4000 },
     });
 
+    console.log(`✅ Database connection established and schemas synchronized.`);
     console.log(`🚀 GraphQL Server ready at: ${url}`);
   } catch (error) {
     console.error('🔴 Failed to start GraphQL server:', error);
@@ -42,4 +43,6 @@ async function startGraphQLServer(): Promise<void> {
   }
 }
 
-startGraphQLServer();
+if (process.env.NODE_ENV !== 'test') {
+  startGraphQLServer();
+}
