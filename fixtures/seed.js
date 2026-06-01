@@ -99,6 +99,10 @@ const TEST_ADDRESSES = [
 //    Real price range: $50–$400 per item, orders: $100–$800 subtotal
 //    Real tax rate: 0.15 (15%)
 //    Real date range: 2018–2024
+//
+//    NOTE: 'total' field stores the tax amount (subtotal × tax rate),
+//    NOT subtotal + tax. This mirrors the real DB data structure.
+//    Sprint 2 validation tests must account for this convention.
 // -------------------------------------------------------------------
 const TEST_ORDERS = [
   {
@@ -178,31 +182,32 @@ const CHART_CONFIGS = [
     share_uuid: "share-bbb-002",
   },
   {
+    // Sprint 2: replace with ProductCategories join once category seed data is added
     id: "chart-003",
-    title: "Revenue split by product category",
+    title: "Orders per province",
     created_by: "user-002",
-    question: "Show revenue split by product category",
+    question: "How many orders came from each province?",
     spec: {
-      chartType: "pie",
-      xAxis: "ProductCategories.name",
-      yAxis: "SUM(OrderItems.price * OrderItems.quantity)",
-      joins: ["OrderItems → Products → ProductGroupCategories → ProductCategories"],
+      chartType: "bar",
+      xAxis: "Addresses.province",
+      yAxis: "COUNT(Orders.id)",
+      joins: ["Orders → Addresses"],
       filters: [],
     },
     share_uuid: "share-ccc-003",
   },
   {
+    // Sprint 2: replace with ProductGroups join once product group seed data is added
     id: "chart-004",
-    title: "Top 10 product groups by revenue",
+    title: "Average order value by year",
     created_by: "user-002",
-    question: "Which product groups make the most revenue?",
+    question: "How has the average order value changed over the years?",
     spec: {
-      chartType: "bar",
-      xAxis: "ProductGroups.name",
-      yAxis: "SUM(OrderItems.price * OrderItems.quantity)",
-      joins: ["OrderItems → Products → ProductGroups"],
+      chartType: "line",
+      xAxis: "year(Orders.createdAt)",
+      yAxis: "AVG(Orders.subtotal)",
+      joins: [],
       filters: [],
-      limit: 10,
     },
     share_uuid: "share-ddd-004",
   },
