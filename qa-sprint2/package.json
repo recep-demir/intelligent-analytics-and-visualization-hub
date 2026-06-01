@@ -1,0 +1,21 @@
+{
+  "name": "eliotax-qa-sprint2",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:auth": "jest tests/auth.test.js",
+    "test:ai": "jest tests/ai-query.test.js",
+    "test:rbac": "jest tests/rbac.test.js",
+    "test:watch": "jest --watch",
+    "seed": "node fixtures/seed.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"],
+    "testTimeout": 10000
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
