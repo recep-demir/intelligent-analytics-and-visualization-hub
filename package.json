@@ -1,0 +1,19 @@
+{
+  "name": "eliotax-qa",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:auth": "jest tests/auth.test.js",
+    "test:ai": "jest tests/ai-query.test.js",
+    "seed": "node fixtures/seed.js",
+    "verify": "node fixtures/verify.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
