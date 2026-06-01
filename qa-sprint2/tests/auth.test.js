@@ -4,8 +4,26 @@
  * QA Sprint 2 — Heba
  * Owner: Dev B (Recep) — POST /auth/login, JWT, /users
  *
- * These tests will FAIL until Recep's auth endpoints are live.
- * That is expected — the tests define the contract.
+ * EXPECTED TO PASS WHEN:
+ *
+ *   Group 1 — "Auth — POST /auth/login" (6 tests)
+ *     ✅ All 6 pass once Recep delivers POST /auth/login
+ *        - admin/analyst/viewer login → 200 + JWT token
+ *        - wrong password            → 401
+ *        - unknown email             → 401
+ *        - missing password          → 400
+ *
+ *   Group 2 — "Auth — JWT token payload" (2 tests)
+ *     ✅ Both pass once login works AND JWT contains role + email fields
+ *        - Recep must include { userId, email, role, exp } in the token payload
+ *
+ *   Group 3 — "Auth — Protected routes" (3 tests)
+ *     ✅ All 3 pass once Recep adds JWT middleware to GET /charts
+ *        - no token  → 403
+ *        - fake token → 401
+ *        - valid admin token → 200
+ *
+ * CURRENTLY: All tests FAIL — /auth/login does not exist yet.
  */
 
 const { login, getToken, get } = require("../helpers/api");
