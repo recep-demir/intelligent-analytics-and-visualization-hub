@@ -5,6 +5,15 @@
  *
  * Shared helper functions used by all test files.
  * Every test imports from here instead of duplicating fetch logic.
+ *
+ * EXPECTED TO PASS WHEN:
+ *   ✅ login()    — passes once Recep (Dev B) delivers POST /auth/login
+ *   ✅ getToken() — passes once login() works (depends on Recep)
+ *   ✅ aiQuery()  — passes once Recep delivers POST /ai/query
+ *   ✅ get()      — passes once Recep delivers the requested route
+ *
+ * These helpers have no tests of their own — they just make
+ * the HTTP calls so test files stay clean and readable.
  */
 
 const { TEST_USERS } = require("../fixtures/seed");
