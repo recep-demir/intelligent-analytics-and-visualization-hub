@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "spike": "ts-node src/ai/spike/sdl-spike.ts",
-    "test:adapter": "ts-node src/ai/test-adapter.ts"
+    "test:adapter": "ts-node scripts/test-adapter.ts"
   },
   "keywords": [],
   "author": "",

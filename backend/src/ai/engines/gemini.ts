@@ -6,6 +6,9 @@ export class GeminiEngine implements AIEngine {
   private model
 
   constructor(apiKey: string) {
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is required')
+    }
     const genAI = new GoogleGenerativeAI(apiKey)
     this.model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
   }
@@ -37,6 +40,10 @@ Return ONLY valid JSON — no explanation, no markdown fences:
     // Strip markdown code fences if Gemini wraps the response
     const json = raw.replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim()
 
-    return JSON.parse(json) as ChartConfig
+    try {
+      return JSON.parse(json) as ChartConfig
+    } catch {
+      throw new Error(`Gemini returned malformed JSON: ${json.slice(0, 100)}`)
+    }
   }
 }

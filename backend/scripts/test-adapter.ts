@@ -1,5 +1,5 @@
-import { AIAdapter } from './adapter'
-import { LocalEngine } from './engines/local'
+import { AIAdapter } from '../src/ai/adapter'
+import { LocalEngine } from '../src/ai/engines/local'
 
 const adapter = new AIAdapter(new LocalEngine())
 

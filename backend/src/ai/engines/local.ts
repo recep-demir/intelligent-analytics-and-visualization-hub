@@ -47,9 +47,9 @@ export class LocalEngine implements AIEngine {
 
     // Country filter
     if (q.includes('canada') || q.includes(' ca '))
-      filters!.push({ field: 'country', operator: 'eq', value: 'CA' })
+      filters.push({ field: 'country', operator: 'eq', value: 'CA' })
     else if (q.includes('united states') || q.includes(' us '))
-      filters!.push({ field: 'country', operator: 'eq', value: 'US' })
+      filters.push({ field: 'country', operator: 'eq', value: 'US' })
 
     // Province filter
     const provinces = [
@@ -60,7 +60,7 @@ export class LocalEngine implements AIEngine {
     ]
     for (const p of provinces) {
       if (q.includes(p)) {
-        filters!.push({ field: 'province', operator: 'eq', value: this.toTitleCase(p) })
+        filters.push({ field: 'province', operator: 'eq', value: this.toTitleCase(p) })
         break
       }
     }
@@ -68,7 +68,7 @@ export class LocalEngine implements AIEngine {
     // Year filter — match 4-digit year
     const yearMatch = q.match(/\b(20\d{2})\b/)
     if (yearMatch)
-      filters!.push({ field: 'year', operator: 'eq', value: yearMatch[1] })
+      filters.push({ field: 'year', operator: 'eq', value: yearMatch[1] })
 
     return filters
   }
