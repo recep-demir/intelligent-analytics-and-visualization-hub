@@ -8,4 +8,7 @@ module.exports = {
   transform: {
     ...tsJestTransformCfg,
   },
+  moduleNameMapper: {
+    ".*schema\\.html.*": "<rootDir>/empty-mock.js"
+  }
 };
