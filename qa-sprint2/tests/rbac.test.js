@@ -5,12 +5,42 @@
  * Owner: Dev B (Recep) + SM Gabryela (JWT spec)
  *
  * Role-Based Access Control — who can do what.
- * These tests will FAIL until Recep's endpoints enforce roles.
  *
  * Roles:
- *   admin   — full access
+ *   admin   — full access to everything
  *   analyst — can query AI and save charts, cannot manage users
- *   viewer  — read-only, cannot query AI or save charts
+ *   viewer  — read-only, cannot query AI or save/delete charts
+ *
+ * EXPECTED TO PASS WHEN:
+ *
+ *   Group 1 — "RBAC — POST /ai/query" (4 tests)
+ *     ✅ All 4 pass once Recep adds role middleware to POST /ai/query
+ *        - admin → 200
+ *        - analyst → 200
+ *        - viewer → 403  (blocked)
+ *        - no token → 403 (blocked)
+ *
+ *   Group 2 — "RBAC — GET /charts" (4 tests)
+ *     ✅ All 4 pass once Recep delivers GET /charts with JWT middleware
+ *        - admin → 200
+ *        - analyst → 200
+ *        - viewer → 200  (viewers can READ charts)
+ *        - no token → 403 (blocked)
+ *
+ *   Group 3 — "RBAC — GET /users" (3 tests)
+ *     ✅ All 3 pass once Recep delivers GET /users (admin-only route)
+ *        - admin → 200
+ *        - analyst → 403 (blocked)
+ *        - viewer → 403  (blocked)
+ *
+ *   Group 4 — "RBAC — Share links" (3 tests)
+ *     ✅ All 3 pass once Burcu (Dev A) delivers the share link UI/endpoints
+ *        - analyst can generate a share link
+ *        - viewer cannot generate a share link → 403
+ *        - public share link works without a token → 200 or 404
+ *
+ * CURRENTLY: All tests FAIL — auth endpoints and role middleware do not exist yet.
+ * NOTE: beforeAll() needs /auth/login to work first (Recep's job).
  */
 
 const { getToken, aiQuery, get } = require("../helpers/api");
