@@ -38,7 +38,7 @@ try {
     Query: {
       products: {
         resolver: 'default',
-        returnType: '[Product!]',
+        returnType: '[Product!]' as any,
       },
     },
   });
