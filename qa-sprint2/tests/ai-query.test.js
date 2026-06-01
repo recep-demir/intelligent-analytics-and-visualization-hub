@@ -4,8 +4,46 @@
  * QA Sprint 2 — Heba
  * Owner: Dev C (Aleksei) — POST /ai/query, chart JSON contract
  *
- * These tests will FAIL until Aleksei's /ai/query endpoint is live.
- * That is expected — the tests define the contract.
+ * EXPECTED TO PASS WHEN:
+ *
+ *   Group 1 — "AI Query — JSON contract" (6 tests)
+ *     ✅ All 6 pass once Aleksei delivers POST /ai/query with correct shape
+ *        - response has: chartConfig.chartType, xAxis, yAxis, joins, filters
+ *        - chartType is one of: bar, line, grid, heatmap, pie, donut, map
+ *        - joins and filters are always arrays (never null/undefined)
+ *        - response includes fromCache boolean
+ *        - second identical question returns fromCache: true (Recep's caching)
+ *
+ *   Group 2 — "AI Query — Bar charts" (2 tests)
+ *     ✅ Both pass once Aleksei's prompt correctly identifies bar chart questions
+ *        - "revenue by province"           → chartType: "bar"
+ *        - "top product groups by revenue" → chartType: "bar"
+ *
+ *   Group 3 — "AI Query — Line charts" (2 tests)
+ *     ✅ Both pass once Aleksei's prompt identifies trend/time questions
+ *        - "orders over the years" → chartType: "line"
+ *        - "revenue trend"         → chartType: "line"
+ *
+ *   Group 4 — "AI Query — Pie charts" (2 tests)
+ *     ✅ Both pass once Aleksei's prompt identifies distribution questions
+ *        - "order status breakdown"       → chartType: "pie"
+ *        - "revenue by product category" → chartType: "pie"
+ *
+ *   Group 5 — "AI Query — Filters" (2 tests)
+ *     ✅ Both pass once Aleksei's prompt extracts filter conditions correctly
+ *        - "shipped orders only" → filters contains { field: status, value: "shipped" }
+ *        - "from 2023"           → filters contains a year/createdAt filter
+ *
+ *   Group 6 — "AI Query — Edge cases" (5 tests)
+ *     ✅ All 5 pass once Recep adds input validation to the endpoint
+ *        - empty question       → 400
+ *        - under 5 chars        → 400
+ *        - nonsense question    → 400 or fallback chart (both acceptable)
+ *        - SQL injection        → server does not crash (200 or 400)
+ *        - 500+ char question   → server does not crash (200 or 400)
+ *
+ * CURRENTLY: All tests FAIL — /ai/query does not exist yet.
+ * NOTE: beforeAll() needs /auth/login to work first (Recep's job).
  */
 
 const { getToken, aiQuery } = require("../helpers/api");
