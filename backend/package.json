@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
-    "spike": "ts-node src/ai/spike/sdl-spike.ts"
+    "spike": "ts-node src/ai/spike/sdl-spike.ts",
+    "test:adapter": "ts-node scripts/test-adapter.ts"
   },
   "keywords": [],
   "author": "",
