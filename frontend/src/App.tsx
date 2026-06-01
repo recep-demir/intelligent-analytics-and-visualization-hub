@@ -31,7 +31,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [chartTitle, setChartTitle] = useState<string>('');
   const [chartType, setChartType] = useState<string>('');
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const chartOptions = {
