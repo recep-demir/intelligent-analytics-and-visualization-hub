@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
-    "dev": "ts-node server.ts"
+    "dev": "ts-node server.ts",
+    "build": "tsc"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
