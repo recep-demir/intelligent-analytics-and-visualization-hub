@@ -18,6 +18,10 @@
       "^.+\\.tsx?$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
     }
   },
+  "dependencies": {
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^22.0.0",
