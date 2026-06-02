@@ -44,6 +44,8 @@ export function buildUserPrompt(nl: string, schemaSdl: string): string {
 Database schema:
 ${schemaSdl}
 
+Available dataset names (use exactly as written): tax_records, towns
+
 Convert this question into a ChartConfig JSON object:
 "${nl}"
 `.trim()
