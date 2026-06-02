@@ -29,7 +29,7 @@
 const { login, getToken, get } = require("../helpers/api");
 const { TEST_USERS } = require("../fixtures/seed");
 
-describe("Auth — POST /auth/login", () => {
+describe.skip("Auth — POST /auth/login", () => {
   test("admin can log in and receives a JWT token", async () => {
     const { status, token, user } = await login("admin@eliotax-test.com", "Test123!");
 
@@ -77,7 +77,7 @@ describe("Auth — POST /auth/login", () => {
   });
 });
 
-describe("Auth — JWT token payload", () => {
+describe.skip("Auth — JWT token payload", () => {
   test("JWT contains correct role for admin", async () => {
     const { token } = await login("admin@eliotax-test.com", "Test123!");
 
@@ -99,7 +99,7 @@ describe("Auth — JWT token payload", () => {
   });
 });
 
-describe("Auth — Protected routes", () => {
+describe.skip("Auth — Protected routes", () => {
   test("request without token to protected route returns 403", async () => {
     const { status } = await get("/charts", null);
 

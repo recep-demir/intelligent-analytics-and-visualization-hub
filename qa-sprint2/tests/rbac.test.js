@@ -45,15 +45,17 @@
 
 const { getToken, aiQuery, get } = require("../helpers/api");
 
-let adminToken;
-let analystToken;
-let viewerToken;
+// TODO Sprint 2: remove .skip once Recep delivers auth endpoints and role middleware
+describe.skip("RBAC — [backend pending]", () => {
+  let adminToken;
+  let analystToken;
+  let viewerToken;
 
-beforeAll(async () => {
-  adminToken  = await getToken("admin");
-  analystToken = await getToken("analyst");
-  viewerToken = await getToken("viewer");
-});
+  beforeAll(async () => {
+    adminToken  = await getToken("admin");
+    analystToken = await getToken("analyst");
+    viewerToken = await getToken("viewer");
+  });
 
 // -------------------------------------------------------------------
 // POST /ai/query
@@ -149,3 +151,5 @@ describe("RBAC — Share links", () => {
     expect([200, 404]).toContain(status);
   });
 });
+
+}); // end describe.skip "RBAC — [backend pending]"
