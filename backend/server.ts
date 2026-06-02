@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import './patch'; 
 import express from 'express';
 import cors from 'cors';
@@ -5,7 +6,11 @@ import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express4';
 import { sequelize, Product } from './models';
 import { generateSchema } from 'graphql-gene';
-import { AIAdapter } from './src/ai/adapter'; 
+import { print } from 'graphql';
+
+import { AIAdapter } from './src/ai/adapter';
+import { GeminiEngine } from './src/ai/engines/gemini';
+import { LocalEngine } from './src/ai/engines/local';
 
 async function startServer(): Promise<void> {
   try {
@@ -24,6 +29,12 @@ async function startServer(): Promise<void> {
       types: { Product }, 
     });
 
+    const engine = process.env.GEMINI_API_KEY
+      ? new GeminiEngine(process.env.GEMINI_API_KEY)
+      : new LocalEngine();
+      
+    const adapter = new AIAdapter(engine);
+
     const app = express();
     app.use(cors());
     app.use(express.json());
@@ -36,14 +47,10 @@ async function startServer(): Promise<void> {
 
         console.log(`🤖 Incoming AI Query: "${nl}"`);
 
-        // UNCOMMENT BELOW WHEN ADAPTER IS IMPORTED:
-        // const result = await adapter.resolve({ nl: nl }, typeDefs);
-        // return res.json(result);
-
-        res.json({
-          message: "Route is active! Waiting for adapter integration.",
-          queryReceived: nl
-        });
+        const schemaSdl = print(typeDefs);
+        const result = await adapter.resolve({ nl }, schemaSdl);
+        
+        res.json(result);
 
       } catch (error) {
         console.error('🔴 AI Error:', error);
