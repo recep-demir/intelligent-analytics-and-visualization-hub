@@ -12,22 +12,36 @@ import { AIAdapter } from './src/ai/adapter';
 import { GeminiEngine } from './src/ai/engines/gemini';
 import { LocalEngine } from './src/ai/engines/local';
 
-async function startServer(): Promise<void> {
+export async function createApolloServer() {
+  await sequelize.authenticate();
+  console.log('✅ Database connection established via Sequelize.');
+  
+  await sequelize.query('PRAGMA foreign_keys = OFF;');
+  await sequelize.sync();
+  await sequelize.query('PRAGMA foreign_keys = ON;');
+  console.log('✅ Database schemas synchronized.');
+
+
+  const { pluginSequelize } = await import('@graphql-gene/plugin-sequelize');
+
+  const { typeDefs, resolvers } = generateSchema({
+    plugins: [pluginSequelize()],
+    types: { Product }, 
+  });
+
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+  });
+
+  
+  return { server, typeDefs };
+}
+
+export async function startServer(): Promise<void> {
   try {
-    await sequelize.authenticate();
-    console.log('✅ Database connection established via Sequelize.');
-
-    await sequelize.query('PRAGMA foreign_keys = OFF;');
-    await sequelize.sync();
-    await sequelize.query('PRAGMA foreign_keys = ON;');
-    console.log('✅ Database schemas synchronized.');
-
-    const { pluginSequelize } = await import('@graphql-gene/plugin-sequelize');
-
-    const { typeDefs, resolvers } = generateSchema({
-      plugins: [pluginSequelize()],
-      types: { Product }, 
-    });
+    const { server, typeDefs } = await createApolloServer();
+    await server.start();
 
     const engine = process.env.GEMINI_API_KEY
       ? new GeminiEngine(process.env.GEMINI_API_KEY)
@@ -58,9 +72,6 @@ async function startServer(): Promise<void> {
       }
     });
 
-    const server = new ApolloServer({ typeDefs, resolvers });
-    await server.start();
-
     app.use('/graphql', expressMiddleware(server));
 
     const PORT = 4000;
@@ -75,4 +86,6 @@ async function startServer(): Promise<void> {
   }
 }
 
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}

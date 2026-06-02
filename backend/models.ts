@@ -2,9 +2,14 @@ import { Sequelize, DataTypes, Model } from 'sequelize';
 import path from 'path';
 import { extendTypes } from 'graphql-gene';
 
+
+const storagePath = process.env.NODE_ENV === 'test' 
+  ? ':memory:' 
+  : path.resolve(__dirname, 'database.sqlite');
+
 export const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: path.resolve(__dirname, 'database.sqlite'),
+  storage: storagePath,
   logging: false
 });
 
@@ -38,7 +43,7 @@ try {
     Query: {
       products: {
         resolver: 'default',
-        returnType: '[Product!]',
+        returnType: '[Product!]' as any,
       },
     },
   });
