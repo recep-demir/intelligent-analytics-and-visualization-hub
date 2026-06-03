@@ -14,7 +14,8 @@ describe('GraphQL API Tests (US-08)', () => {
       { name: 'Test iPhone' }
     ]);
 
-    server = await createApolloServer();
+    const setup = await createApolloServer();
+    server = setup.server;
   });
 
   afterAll(async () => {
