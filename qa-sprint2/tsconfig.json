@@ -3,10 +3,12 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "ignoreDeprecations": "5.0",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["jest", "node"]
-  }
+    "allowJs": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["**/*.ts", "**/*.js"],
+  "exclude": ["node_modules"]
 }
