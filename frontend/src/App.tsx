@@ -67,7 +67,7 @@ export default function App() {
       // Hardcoded port fixed to 4000 via fallback, utilizing environment variable structure
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
       
-      const response = await fetch(`${API_URL}/ai/query`, {
+      const response = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
