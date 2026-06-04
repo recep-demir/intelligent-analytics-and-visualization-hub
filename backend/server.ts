@@ -54,23 +54,32 @@ export async function startServer(): Promise<void> {
     app.use(express.json());
 
     // AI ADAPTER ROUTE
-    app.post('/api/ai/query', async (req, res) => {
-      try {
-        const { nl } = req.body; 
-        if (!nl) return res.status(400).json({ error: "Missing natural language query (nl)!" });
+        app.post('/api/ai/query', async (req, res) => {
+  try {
+    const rawQuestion = req.body?.question ?? req.body?.nl;
 
-        console.log(`🤖 Incoming AI Query: "${nl}"`);
+    if (typeof rawQuestion !== 'string' || rawQuestion.trim().length === 0) {
+      return res.status(400).json({
+        error: 'Missing question in request body',
+      });
+    }
 
-        const schemaSdl = print(typeDefs);
-        const result = await adapter.resolve({ nl }, schemaSdl);
-        
-        res.json(result);
+    const question = rawQuestion.trim();
 
-      } catch (error) {
-        console.error('🔴 AI Error:', error);
-        res.status(500).json({ error: "An error occurred while processing the AI request" });
-      }
+    console.log(`🤖 Incoming AI Query: "${question}"`);
+
+    const schemaSdl = print(typeDefs);
+    const result = await adapter.resolve({ nl: question }, schemaSdl);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('🔴 AI Error:', error);
+
+    return res.status(500).json({
+      error: 'An error occurred while processing the AI request',
     });
+  }
+});
 
     app.use('/graphql', expressMiddleware(server));
 
