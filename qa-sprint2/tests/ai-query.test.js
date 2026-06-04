@@ -48,16 +48,10 @@
 
 const { getToken, aiQuery } = require("../helpers/api");
 
-// TODO Sprint 2: remove .skip once Recep delivers POST /auth/login and Aleksei delivers POST /ai/query
-describe.skip("AI Query — [backend pending]", () => {
-  // Shared admin token for most tests
-  let adminToken;
-  let analystToken;
-
-  beforeAll(async () => {
-    adminToken = await getToken("admin");
-    analystToken = await getToken("analyst");
-  });
+describe("AI Query", () => {
+  // Auth not yet implemented — tokens set to null, backend ignores Authorization header
+  let adminToken = null;
+  let analystToken = null;
 
 // -------------------------------------------------------------------
 // JSON CONTRACT — every response must have these fields
@@ -224,4 +218,4 @@ describe("AI Query — Edge cases", () => {
   });
 });
 
-}); // end describe.skip "AI Query — [backend pending]"
+});
