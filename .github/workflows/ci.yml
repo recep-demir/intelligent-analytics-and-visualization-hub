@@ -36,3 +36,38 @@ jobs:
     - name: Install root dependencies
       run: npm install
       continue-on-error: true
+
+  qa-tests:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/development' || github.base_ref == 'development'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm install
+
+    - name: Start backend server
+      run: |
+        cd backend
+        npm run dev &
+        echo "Waiting for backend to be ready..."
+        npx wait-on http://localhost:4000/graphql --timeout 30000
+
+    - name: Install QA dependencies
+      run: |
+        cd qa-sprint2
+        npm install
+
+    - name: Run AI query tests
+      run: |
+        cd qa-sprint2
+        npm run test:ai
