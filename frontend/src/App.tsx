@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./index.css";
-import { ChartRenderer, ChartRenderData } from "./components/ChartRenderer";
+import { ChartRenderer, type ChartRenderData } from "./components/ChartRenderer";
 
 interface ChartConfig {
   chartType: "line" | "bar" | "pie" | "grid" | "heatmap" | "donut" | "map";
