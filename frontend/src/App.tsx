@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./index.css";
 
-// Types aligned with the shared project contract (shared/types/ai.ts)
+// Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
-  chartType: "line" | "bar" | "pie";
-  xAxis: string;
-  yAxis: string;
-  filters?: any;
-  joins?: any;
+  chartType: "line" | "bar" | "pie" | "grid" | "heatmap" | "donut" | "map";
+  dataset: string;
+  filters?: { field: string; operator: string; value: string }[];
+  groupBy?: string;
+  title?: string;
 }
 
 interface NLQueryResponse {
@@ -170,8 +170,9 @@ export default function App() {
               <p className="text-emerald-400 font-medium mb-2">✨ Data Visualized Successfully!</p>
               <div className="bg-gray-900 p-4 rounded border border-gray-700 inline-block text-left font-mono text-xs text-gray-300">
                 <p><strong>Chart Type:</strong> {chartData.chartConfig.chartType}</p>
-                <p><strong>X Axis:</strong> {chartData.chartConfig.xAxis}</p>
-                <p><strong>Y Axis:</strong> {chartData.chartConfig.yAxis}</p>
+                <p><strong>Dataset:</strong> {chartData.chartConfig.dataset}</p>
+                {chartData.chartConfig.groupBy && <p><strong>Group By:</strong> {chartData.chartConfig.groupBy}</p>}
+                {chartData.chartConfig.title && <p><strong>Title:</strong> {chartData.chartConfig.title}</p>}
                 <p className="text-gray-500 mt-2 text-[10px]">Source: {chartData.fromCache ? "Cache Storage" : "Live Compute Engine"}</p>
               </div>
             </div>
