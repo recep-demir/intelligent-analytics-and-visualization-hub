@@ -118,8 +118,7 @@ describe("AI Query — Bar charts", () => {
 // LINE CHARTS
 // -------------------------------------------------------------------
 describe("AI Query — Line charts", () => {
-  // TODO Sprint 3: Aleksei to add chart type selection rules to SYSTEM_INSTRUCTION in backend/src/ai/prompt.ts
-  test.skip("'orders over time' returns a line chart", async () => {
+  test("'orders over time' returns a line chart", async () => {
     const { body } = await aiQuery("How have orders changed over the years?", adminToken);
 
     expect(body.chartConfig.chartType).toBe("line");
@@ -136,15 +135,13 @@ describe("AI Query — Line charts", () => {
 // PIE CHARTS
 // -------------------------------------------------------------------
 describe("AI Query — Pie charts", () => {
-  // TODO Sprint 3: Aleksei to add chart type selection rules to SYSTEM_INSTRUCTION in backend/src/ai/prompt.ts
-  test.skip("'order status breakdown' returns a pie chart", async () => {
+  test("'order status breakdown' returns a pie chart", async () => {
     const { body } = await aiQuery("What is the breakdown of order statuses?", adminToken);
 
     expect(body.chartConfig.chartType).toBe("pie");
   });
 
-  // TODO Sprint 3: Aleksei to add chart type selection rules to SYSTEM_INSTRUCTION in backend/src/ai/prompt.ts
-  test.skip("'revenue by product category' returns a pie chart", async () => {
+  test("'revenue by product category' returns a pie chart", async () => {
     const { body } = await aiQuery("Show revenue split by product category", adminToken);
 
     expect(body.chartConfig.chartType).toBe("pie");
@@ -155,8 +152,7 @@ describe("AI Query — Pie charts", () => {
 // FILTERS
 // -------------------------------------------------------------------
 describe("AI Query — Filters", () => {
-  // TODO Sprint 3: Aleksei to improve filter extraction in SYSTEM_INSTRUCTION in backend/src/ai/prompt.ts
-  test.skip("'only shipped orders' applies a status filter", async () => {
+  test("'only shipped orders' applies a status filter", async () => {
     const { body } = await aiQuery("Show revenue from shipped orders only", adminToken);
 
     const { filters } = body.chartConfig;
