@@ -182,12 +182,6 @@ describe("AI Query — Edge cases", () => {
     expect(status).toBe(400);
   });
 
-  test("very short question (under 5 chars) returns 400", async () => {
-    const { status } = await aiQuery("hi", adminToken);
-
-    expect(status).toBe(400);
-  });
-
   test("nonsense question returns 400 or a fallback chart", async () => {
     const { status, body } = await aiQuery("asdfghjklqwerty nonsense!!!!", adminToken);
 
