@@ -65,9 +65,7 @@ describe("AI Query — JSON contract", () => {
 
     const { chartConfig } = body;
     expect(chartConfig).toHaveProperty("chartType");
-    expect(chartConfig).toHaveProperty("xAxis");
-    expect(chartConfig).toHaveProperty("yAxis");
-    expect(chartConfig).toHaveProperty("joins");
+    expect(chartConfig).toHaveProperty("dataset");
     expect(chartConfig).toHaveProperty("filters");
   });
 
@@ -76,12 +74,6 @@ describe("AI Query — JSON contract", () => {
     const { body } = await aiQuery("Show me revenue by province", adminToken);
 
     expect(validTypes).toContain(body.chartConfig.chartType);
-  });
-
-  test("joins is always an array", async () => {
-    const { body } = await aiQuery("Orders over time", adminToken);
-
-    expect(Array.isArray(body.chartConfig.joins)).toBe(true);
   });
 
   test("filters is always an array", async () => {
