@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./index.css";
+import { ChartRenderer, ChartRenderData } from "./components/ChartRenderer";
 
-// Types aligned with the shared project contract (shared/types/ai.ts)
 interface ChartConfig {
-  chartType: "line" | "bar" | "pie";
-  xAxis: string;
-  yAxis: string;
-  filters?: any;
-  joins?: any;
+  chartType: "line" | "bar" | "pie" | "grid" | "heatmap" | "donut" | "map";
+  dataset: string;
+  filters?: { field: string; operator: string; value: string }[];
+  groupBy?: string;
+  title?: string;
 }
 
 interface NLQueryResponse {
@@ -17,15 +17,14 @@ interface NLQueryResponse {
 
 export default function App() {
   const [query, setQuery] = useState("");
-  const [userRole, setUserRole] = useState("Admin"); // Role management simulator
+  const [userRole, setUserRole] = useState("Admin");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<NLQueryResponse | null>(null);
-  
-  // Ref to keep track of the AbortController for fetch cancellation
+  const [renderData, setRenderData] = useState<ChartRenderData | null>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Cancel any pending request on component unmount to prevent memory leaks
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -38,17 +37,16 @@ export default function App() {
     e.preventDefault();
     if (!query.trim()) return;
 
-    // Abort the previous ongoing request if a new one is submitted
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Reset UI states before a new request
     setError(null);
     setChartData(null);
+    setRenderData(null);
     setIsLoading(true);
 
     // UX Safeguard: Client-side keyword check (US-03)
@@ -64,31 +62,39 @@ export default function App() {
     }
 
     try {
-      // Hardcoded port fixed to 4000 via fallback, utilizing environment variable structure
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-      
-      const response = await fetch(`${API_URL}/api/ai/query`, {
+
+      // Step 1: get ChartConfig from AI
+      const aiResponse = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal, // Link abort signal to fetch
-        body: JSON.stringify({ nl: query }), // Aligned field payload: contract expects 'nl' instead of 'input'
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ nl: query }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`);
+      if (!aiResponse.ok) {
+        throw new Error(`Server responded with status ${aiResponse.status}`);
       }
 
-      const data: NLQueryResponse = await response.json();
-      setChartData(data);
+      const aiData: NLQueryResponse = await aiResponse.json();
+      setChartData(aiData);
+
+      // Step 2: fetch real data for rendering
+      const dataResponse = await fetch(`${API_URL}/api/charts/data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify(aiData.chartConfig),
+      });
+
+      if (dataResponse.ok) {
+        const chartRenderData: ChartRenderData = await dataResponse.json();
+        setRenderData(chartRenderData);
+      }
     } catch (err) {
-      // Gracefully ignore state updates if the request was deliberately aborted by the user/system
       if (err instanceof Error && err.name === "AbortError") {
         return;
       }
-      
-      // Strict TypeScript mode compliance (instead of err: any)
       if (err instanceof Error) {
         setError(err.message || "An error occurred while fetching analytics data.");
       } else {
@@ -101,11 +107,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
-      {/* Role Selector Simulator (Useful for Testing QA paths) */}
+      {/* Role Selector Simulator */}
       <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700">
         <label className="mr-2 text-sm text-gray-400">Current Role:</label>
-        <select 
-          value={userRole} 
+        <select
+          value={userRole}
           onChange={(e) => setUserRole(e.target.value)}
           className="bg-gray-700 text-white rounded px-2 py-1 text-sm outline-none cursor-pointer"
         >
@@ -119,7 +125,6 @@ export default function App() {
           Elio Tax AI Assistant
         </h1>
 
-        {/* Query Input Form */}
         <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
           <input
             type="text"
@@ -138,10 +143,8 @@ export default function App() {
           </button>
         </form>
 
-        {/* Dynamic Display Panel representing 4 clean UI states */}
-        <div className="w-full min-h-[250px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
-          
-          {/* State 1: Loading State */}
+        <div className="w-full bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center min-h-[250px]">
+          {/* Loading */}
           {isLoading && (
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -149,7 +152,7 @@ export default function App() {
             </div>
           )}
 
-          {/* State 2: Error Feedback UI */}
+          {/* Error */}
           {error && !isLoading && (
             <div className="w-full max-w-md bg-red-900/30 border border-red-500/40 text-red-200 p-4 rounded-lg text-center">
               <p className="font-semibold mb-1">An Error Occurred</p>
@@ -157,23 +160,34 @@ export default function App() {
             </div>
           )}
 
-          {/* State 3: Empty Default State */}
+          {/* Empty */}
           {!isLoading && !error && !chartData && (
             <p className="text-gray-500 text-center">
               Enter a prompt above to see analytical tax charts generated in real-time.
             </p>
           )}
 
-          {/* State 4: Success Visualization State matching the contract response */}
+          {/* Success */}
           {!isLoading && !error && chartData && (
-            <div className="w-full text-center">
-              <p className="text-emerald-400 font-medium mb-2">✨ Data Visualized Successfully!</p>
-              <div className="bg-gray-900 p-4 rounded border border-gray-700 inline-block text-left font-mono text-xs text-gray-300">
-                <p><strong>Chart Type:</strong> {chartData.chartConfig.chartType}</p>
-                <p><strong>X Axis:</strong> {chartData.chartConfig.xAxis}</p>
-                <p><strong>Y Axis:</strong> {chartData.chartConfig.yAxis}</p>
-                <p className="text-gray-500 mt-2 text-[10px]">Source: {chartData.fromCache ? "Cache Storage" : "Live Compute Engine"}</p>
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <p className="text-emerald-400 font-medium">
+                  {chartData.chartConfig.title ?? chartData.chartConfig.dataset}
+                </p>
+                <div className="flex gap-3 text-xs text-gray-500 font-mono">
+                  <span>type: {chartData.chartConfig.chartType}</span>
+                  {chartData.chartConfig.groupBy && (
+                    <span>group: {chartData.chartConfig.groupBy}</span>
+                  )}
+                  <span>{chartData.fromCache ? "cache" : "live"}</span>
+                </div>
               </div>
+
+              {renderData ? (
+                <ChartRenderer config={chartData.chartConfig} data={renderData} />
+              ) : (
+                <p className="text-gray-500 text-center text-sm">Loading chart data...</p>
+              )}
             </div>
           )}
         </div>

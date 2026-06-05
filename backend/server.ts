@@ -11,6 +11,8 @@ import { print } from 'graphql';
 import { AIAdapter } from './src/ai/adapter';
 import { GeminiEngine } from './src/ai/engines/gemini';
 import { LocalEngine } from './src/ai/engines/local';
+import { fetchChartData } from './src/data/chartDataService';
+import { ChartConfig } from '../shared/types/chart';
 
 export async function createApolloServer() {
   await sequelize.authenticate();
@@ -80,6 +82,21 @@ export async function startServer(): Promise<void> {
     });
   }
 });
+
+    // CHART DATA ROUTE
+    app.post('/api/charts/data', async (req, res) => {
+      try {
+        const config: ChartConfig = req.body;
+        if (!config?.dataset || !config?.chartType) {
+          return res.status(400).json({ error: 'chartConfig with dataset and chartType is required' });
+        }
+        const data = await fetchChartData(config);
+        return res.status(200).json(data);
+      } catch (error) {
+        console.error('🔴 Chart Data Error:', error);
+        return res.status(500).json({ error: 'Failed to fetch chart data' });
+      }
+    });
 
     app.use('/graphql', expressMiddleware(server));
 
