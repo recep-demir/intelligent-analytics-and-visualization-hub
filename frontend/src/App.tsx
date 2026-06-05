@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./index.css";
 
+// Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
-  chartType: "line" | "bar" | "pie";
-  groupBy: string;   
-  dataset: string;   
-  filters?: any[];
+  chartType: "line" | "bar" | "pie" | "grid" | "heatmap" | "donut" | "map";
+  dataset: string;
+  filters?: { field: string; operator: string; value: string }[];
+  groupBy?: string;
   title?: string;
 }
 
