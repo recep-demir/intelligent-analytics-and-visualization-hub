@@ -306,9 +306,16 @@ export default function App() {
                           record["province"] ??
                           record["region"] ??
                           record["year"] ??
-                          `Cluster ${i + 1}`;
+                          record["label"] ??
+                          record["name"] ??
+                          record["status"] ??
+                          `Item ${i + 1}`;
                         const label = REAL_LABELS[rawLabel] ?? rawLabel;
                         const value = record.percentage ?? record.value ?? 0;
+                        const displayValue =
+                          value >= 1000
+                            ? `CA$${(value / 1000).toFixed(1)}K`
+                            : `${value}%`;
 
                         const chartPalette = [
                           "bg-blue-500",
@@ -323,7 +330,7 @@ export default function App() {
                           <div
                             key={i}
                             className="flex justify-between items-center text-xs font-mono p-1.5 rounded-lg hover:bg-gray-950/30 border border-transparent hover:border-gray-800/30 transition-all"
-                            title={`${label}: ${value}%`}
+                            title={`${label}: ${displayValue}`}
                           >
                             <div className="flex items-center gap-2.5">
                               <span
@@ -332,7 +339,7 @@ export default function App() {
                               <span className="text-gray-300">{label}</span>
                             </div>
                             <span className="text-blue-400 font-bold bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/20">
-                              {value}%
+                              {displayValue}
                             </span>
                           </div>
                         );
@@ -342,44 +349,51 @@ export default function App() {
                 )}
                 {chartData.chartConfig.chartType === "bar" && (
                   <div key="bar-chart-view" className="w-full space-y-4 pt-1">
-                    {chartData.data?.map((record: any, index: number) => {
-                      const currentGroupBy =
-                        chartData.chartConfig.groupBy || "province";
-                      const rawLabel =
-                        record[currentGroupBy] ??
-                        record["province"] ??
-                        record["region"] ??
-                        `Cluster ${index + 1}`;
-                      const label = REAL_LABELS[rawLabel] ?? rawLabel;
-                      const value = record.percentage ?? record.value ?? 0;
+                    {(() => {
+                      const records = chartData.data ?? [];
+                      const maxValue = Math.max(...records.map((r: any) => r.percentage ?? r.value ?? 0), 1);
+                      return records.map((record: any, index: number) => {
+                        const currentGroupBy =
+                          chartData.chartConfig.groupBy || "province";
+                        const rawLabel =
+                          record[currentGroupBy] ??
+                          record["province"] ??
+                          record["region"] ??
+                          record["label"] ??
+                          record["name"] ??
+                          record["status"] ??
+                          `Item ${index + 1}`;
+                        const label = REAL_LABELS[rawLabel] ?? rawLabel;
+                        const value = record.percentage ?? record.value ?? 0;
+                        const barWidth = Math.min((value / maxValue) * 100, 100);
+                        const displayValue =
+                          value >= 1000
+                            ? `CA$${(value / 1000).toFixed(1)}K`
+                            : `${value}%`;
 
-                      return (
-                        <div
-                          key={index}
-                          className="w-full group p-2.5 rounded-xl bg-gray-950/20 hover:bg-gray-950/50 border border-transparent hover:border-gray-800/40 transition-all duration-200"
-                        >
-                          <div className="flex justify-between items-center text-xs font-mono mb-2">
-                            <span className="text-gray-300 font-medium group-hover:text-white transition-colors">
-                              {label}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-gray-500 text-[10px]">
-                                Share:
+                        return (
+                          <div
+                            key={index}
+                            className="w-full group p-2.5 rounded-xl bg-gray-950/20 hover:bg-gray-950/50 border border-transparent hover:border-gray-800/40 transition-all duration-200"
+                          >
+                            <div className="flex justify-between items-center text-xs font-mono mb-2">
+                              <span className="text-gray-300 font-medium group-hover:text-white transition-colors">
+                                {label}
                               </span>
                               <span className="text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded">
-                                {value}%
+                                {displayValue}
                               </span>
                             </div>
+                            <div className="w-full bg-gray-950 h-3 rounded-lg overflow-hidden p-[2px] border border-gray-800/60 shadow-inner">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 h-full rounded-md shadow-[0_0_12px_rgba(59,130,246,0.3)] group-hover:brightness-110 transition-all duration-500 ease-out"
+                                style={{ width: `${barWidth}%` }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-950 h-3 rounded-lg overflow-hidden p-[2px] border border-gray-800/60 shadow-inner">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 h-full rounded-md shadow-[0_0_12px_rgba(59,130,246,0.3)] group-hover:brightness-110 transition-all duration-500 ease-out"
-                              style={{ width: `${value}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                   </div>
                 )}
                 {chartData.chartConfig.chartType === "line" && (
