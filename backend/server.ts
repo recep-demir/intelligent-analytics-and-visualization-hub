@@ -80,15 +80,17 @@ export async function startServer(): Promise<void> {
         const groupBy: string = (chartConfig.groupBy ?? "").toLowerCase();
         const lowerQuestion = question.toLowerCase();
 
-        // Extract year from filters or question
+        // Extract year(s) from filters or question
         const yearFilter = filters.find((f: any) =>
           f.field?.toLowerCase().includes("year") ||
           f.field?.toLowerCase().includes("createdat")
         );
-        const yearFromQuestion = question.match(/\b(20\d{2})\b/)?.[1];
+        const allYearsInQuestion = question.match(/\b(20\d{2})\b/g) ?? [];
         const targetYear: string | null = yearFilter?.value
           ? String(yearFilter.value).trim()
-          : yearFromQuestion ?? null;
+          : allYearsInQuestion.length === 1 ? allYearsInQuestion[0] ?? null : null;
+        const yearRangeStart: string | null = allYearsInQuestion.length >= 2 ? allYearsInQuestion[0] ?? null : null;
+        const yearRangeEnd: string | null = allYearsInQuestion.length >= 2 ? allYearsInQuestion[allYearsInQuestion.length - 1] ?? null : null;
 
         let finalDataPayload: any[] = [];
 
@@ -101,7 +103,11 @@ export async function startServer(): Promise<void> {
           lowerQuestion.includes("years")
         ) {
           let sql = `SELECT strftime('%Y', createdAt) as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
-          if (targetYear) sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+          if (yearRangeStart && yearRangeEnd) {
+            sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
+          } else if (targetYear) {
+            sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+          }
           sql += ` GROUP BY year ORDER BY year`;
           const [rows] = await sequelize.query(sql);
           finalDataPayload = rows as any[];
