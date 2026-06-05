@@ -397,195 +397,84 @@ export default function App() {
                   </div>
                 )}
                 {chartData.chartConfig.chartType === "line" && (
-                  <div
-                    key="line-chart-view"
-                    className="w-full pt-4 flex flex-col justify-between"
-                  >
-                    {/* IF SINGLE DATA NODE: Show high-visibility metric breakdown */}
-                    {chartData.data && chartData.data.length === 1 ? (
-                      <div className="w-full bg-gray-950/50 border border-blue-900/40 rounded-xl p-5 text-center backdrop-blur-sm shadow-inner">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block mb-1">
-                          Target Year Snapshot
-                        </span>
-                        <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
-                          {chartData.data[0].year ??
-                            chartData.data[0].tax_year ??
-                            "2025"}
-                        </h3>
-                        <div className="inline-flex items-center gap-4 bg-gray-900/80 px-4 py-2 rounded-lg border border-gray-800">
-                          <div>
-                            <span className="text-[10px] text-gray-500 font-mono block">
-                              VALUE
-                            </span>
-                            <span className="text-base font-bold text-white font-mono">
-                              ${(chartData.data[0].value ?? 0).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="w-px h-8 bg-gray-800"></div>
-                          <div>
-                            <span className="text-[10px] text-gray-500 font-mono block">
-                              SHARE
-                            </span>
-                            <span className="text-base font-bold text-emerald-400 font-mono">
-                              {chartData.data[0].percentage ?? 0}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* IF MULTI-DATA NODES: Render standard continuous line track */
-                      <div className="relative w-full h-36 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-visible backdrop-blur-sm">
-                        <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed"></div>
-                        <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed"></div>
-                        <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed"></div>
+                  <div key="line-chart-view" className="w-full pt-4">
+                    {(() => {
+                      const points = chartData.data ?? [];
+                      if (points.length === 0) return null;
 
-                        <svg
-                          className="w-full h-full overflow-visible"
-                          viewBox="0 0 100 40"
-                          preserveAspectRatio="none"
-                        >
-                          <defs>
-                            <linearGradient
-                              id="line-glow"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="0%"
-                                stopColor="#3b82f6"
-                                stopOpacity="0.25"
-                              />
-                              <stop
-                                offset="100%"
-                                stopColor="#3b82f6"
-                                stopOpacity="0.0"
-                              />
-                            </linearGradient>
-                            <linearGradient
-                              id="line-gradient"
-                              x1="0%"
-                              y1="0%"
-                              x2="100%"
-                              y2="0%"
-                            >
-                              <stop offset="0%" stopColor="#3b82f6" />
-                              <stop offset="50%" stopColor="#6366f1" />
-                              <stop offset="100%" stopColor="#10b981" />
-                            </linearGradient>
-                          </defs>
+                      const getValue = (d: any) => {
+                        const val = d.amount ?? d.value ?? d.percentage ?? d.total;
+                        return typeof val === "number" ? val : parseFloat(val) || 0;
+                      };
+                      const getLabel = (d: any, i: number) =>
+                        d.year ?? d.tax_year ?? d.date ?? d.label ?? `Pt ${i + 1}`;
 
-                          {(() => {
-                            const points = chartData.data || [];
-                            if (points.length === 0) return null;
+                      const rawValues = points.map(getValue);
+                      const maxValue = Math.max(...rawValues, 1);
+                      const minValue = Math.min(...rawValues, 0);
+                      const midValue = (maxValue + minValue) / 2;
+                      const valueRange = maxValue - minValue || 1;
 
-                            const getValue = (d: any) => {
-                              const val =
-                                d.amount ??
-                                d.value ??
-                                d.percentage ??
-                                d.total ??
-                                d.tax_due ??
-                                d.tax_amount;
-                              return typeof val === "number"
-                                ? val
-                                : parseFloat(val) || 0;
-                            };
+                      const coords = points.map((d, i) => ({
+                        x: points.length > 1 ? (i / (points.length - 1)) * 100 : 50,
+                        y: 34 - ((getValue(d) - minValue) / valueRange) * 28,
+                        label: getLabel(d, i),
+                        val: getValue(d),
+                      }));
 
-                            const getLabel = (d: any, index: number) => {
-                              return (
-                                d.year ??
-                                d.tax_year ??
-                                d.date ??
-                                d.label ??
-                                d.period ??
-                                `Pt ${index + 1}`
-                              );
-                            };
+                      const formatVal = (v: number) =>
+                        v >= 1000 ? `CA$${(v / 1000).toFixed(0)}K` : `${v}`;
 
-                            const rawValues = points.map((d) => getValue(d));
-                            const maxValue = Math.max(...rawValues, 1);
-                            const minValue = Math.min(...rawValues, 0);
-                            const valueRange = maxValue - minValue || 1;
+                      const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`).join(" ");
+                      const areaPath = `${linePath} L ${coords[coords.length - 1].x} 38 L ${coords[0].x} 38 Z`;
 
-                            const coordinates = points.map((d, index) => {
-                              const x =
-                                points.length > 1
-                                  ? (index / (points.length - 1)) * 100
-                                  : 50;
-                              const currentVal = getValue(d);
+                      return (
+                        <>
+                          <div className="flex gap-1 items-stretch">
+                            {/* Y axis labels */}
+                            <div className="flex flex-col justify-between text-right text-[9px] font-mono text-gray-500 pr-1 py-1" style={{ width: "44px" }}>
+                              <span>{formatVal(maxValue)}</span>
+                              <span>{formatVal(midValue)}</span>
+                              <span>{formatVal(minValue)}</span>
+                            </div>
 
-                              const y =
-                                34 -
-                                ((currentVal - minValue) / valueRange) * 28;
-
-                              return {
-                                x,
-                                y,
-                                label: getLabel(d, index),
-                                val: currentVal,
-                              };
-                            });
-
-                            const linePathStr = coordinates
-                              .map(
-                                (c, i) =>
-                                  `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`,
-                              )
-                              .join(" ");
-                            const areaPathStr = `${linePathStr} L ${coordinates[coordinates.length - 1].x} 38 L ${coordinates[0].x} 38 Z`;
-
-                            return (
-                              <>
-                                <path d={areaPathStr} fill="url(#line-glow)" />
-                                <path
-                                  d={linePathStr}
-                                  fill="none"
-                                  stroke="url(#line-gradient)"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-
-                                {coordinates.map((c, idx) => (
-                                  <circle
-                                    key={idx}
-                                    cx={c.x}
-                                    cy={c.y}
-                                    r="2.5"
-                                    className="fill-gray-900 stroke-indigo-400 stroke-[2] cursor-pointer"
-                                  >
-                                    <title>{`${c.label}: $${c.val.toLocaleString()}`}</title>
+                            {/* Chart area */}
+                            <div className="flex-1 relative h-36 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-visible backdrop-blur-sm">
+                              <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed"></div>
+                              <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed"></div>
+                              <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed"></div>
+                              <svg className="w-full h-full overflow-visible" viewBox="0 0 100 40" preserveAspectRatio="none">
+                                <defs>
+                                  <linearGradient id="line-glow" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                                  </linearGradient>
+                                  <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stopColor="#3b82f6" />
+                                    <stop offset="50%" stopColor="#6366f1" />
+                                    <stop offset="100%" stopColor="#10b981" />
+                                  </linearGradient>
+                                </defs>
+                                <path d={areaPath} fill="url(#line-glow)" />
+                                <path d={linePath} fill="none" stroke="url(#line-gradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                {coords.map((c, i) => (
+                                  <circle key={i} cx={c.x} cy={c.y} r="2.5" className="fill-gray-900 stroke-indigo-400 stroke-[2] cursor-pointer">
+                                    <title>{`${c.label}: ${formatVal(c.val)}`}</title>
                                   </circle>
                                 ))}
-                              </>
-                            );
-                          })()}
-                        </svg>
-                      </div>
-                    )}
+                              </svg>
+                            </div>
+                          </div>
 
-                    <div className="flex justify-between items-center text-[11px] text-gray-500 font-mono mt-3 px-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500/50"></span>
-                        {chartData.data?.[0]?.year ??
-                          chartData.data?.[0]?.tax_year ??
-                          "Start"}
-                      </span>
-                      <span className="text-gray-600">
-                        {chartData.data && chartData.data.length === 1
-                          ? "Isolated point snapshot view"
-                          : "Hover nodes to view data details"}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        {chartData.data?.[chartData.data.length - 1]?.year ??
-                          chartData.data?.[chartData.data.length - 1]
-                            ?.tax_year ??
-                          "End"}
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
-                      </span>
-                    </div>
+                          {/* X axis — year labels */}
+                          <div className="flex justify-between text-[9px] font-mono text-gray-500 mt-1 pr-1" style={{ paddingLeft: "52px" }}>
+                            {coords.map((c, i) => (
+                              <span key={i}>{c.label}</span>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
                 <p className="text-gray-500 text-[10px] font-mono mt-6 text-center">
