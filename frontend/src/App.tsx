@@ -402,6 +402,30 @@ export default function App() {
                       const points = chartData.data ?? [];
                       if (points.length === 0) return null;
 
+                      // Single year — show snapshot card instead of line chart
+                      if (points.length === 1) {
+                        const val = points[0].value ?? points[0].amount ?? 0;
+                        const year = points[0].year ?? points[0].tax_year ?? "—";
+                        return (
+                          <div className="w-full bg-gray-950/50 border border-blue-900/40 rounded-xl p-5 text-center backdrop-blur-sm shadow-inner">
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block mb-1">
+                              Year Snapshot
+                            </span>
+                            <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
+                              {year}
+                            </h3>
+                            <div className="inline-flex items-center gap-4 bg-gray-900/80 px-4 py-2 rounded-lg border border-gray-800">
+                              <div>
+                                <span className="text-[10px] text-gray-500 font-mono block">REVENUE</span>
+                                <span className="text-base font-bold text-white font-mono">
+                                  CA${Number(val).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       const getValue = (d: any) => {
                         const val = d.amount ?? d.value ?? d.percentage ?? d.total;
                         return typeof val === "number" ? val : parseFloat(val) || 0;
