@@ -5,7 +5,7 @@
   "scripts": {
     "test": "jest",
     "test:auth": "jest tests/auth.test.js",
-    "test:ai": "jest tests/ai-query.test.js",
+    "test:ai": "jest tests/ai-query.test.js --forceExit",
     "test:rbac": "jest tests/rbac.test.js",
     "test:watch": "jest --watch",
     "seed": "node fixtures/seed.js"
