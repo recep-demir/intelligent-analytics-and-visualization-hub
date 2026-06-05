@@ -1,6 +1,23 @@
 import { createHash } from 'crypto'
 import { AIEngine, NLQueryRequest, NLQueryResponse } from '../../../shared/types/ai'
-import { ChartConfig } from '../../../shared/types/chart'
+import { ChartConfig, ChartType, Operator } from '../../../shared/types/chart'
+
+const VALID_CHART_TYPES: ChartType[] = ['bar', 'line', 'grid', 'heatmap', 'pie', 'donut', 'map']
+const VALID_OPERATORS:   Operator[]  = ['eq', 'gt', 'lt', 'contains']
+
+function validateChartConfig(config: ChartConfig): ChartConfig {
+  // Ensure chartType is one of the allowed values
+  if (!VALID_CHART_TYPES.includes(config.chartType)) {
+    config.chartType = 'bar'
+  }
+
+  // Strip any filters with invalid operators
+  if (config.filters) {
+    config.filters = config.filters.filter(f => VALID_OPERATORS.includes(f.operator))
+  }
+
+  return config
+}
 
 export class AIAdapter {
   private cache = new Map<string, ChartConfig>()
@@ -9,7 +26,6 @@ export class AIAdapter {
   constructor(private engine: AIEngine) {}
 
   async resolve(request: NLQueryRequest, schemaSdl: string): Promise<NLQueryResponse> {
-    // Cache key = hash of question + schema so different schemas produce different results
     const cacheKey = createHash('sha1')
       .update(request.nl + schemaSdl)
       .digest('hex')
@@ -19,14 +35,14 @@ export class AIAdapter {
       return { chartConfig: cached, fromCache: true }
     }
 
-    const chartConfig = await this.engine.resolve(request.nl, schemaSdl)
+    const raw         = await this.engine.resolve(request.nl, schemaSdl)
+    const chartConfig = validateChartConfig(raw)
 
     this.cache.set(cacheKey, chartConfig)
 
     return { chartConfig, fromCache: false }
   }
 
-  // Allows Dev B to clear the cache if the schema changes
   clearCache(): void {
     this.cache.clear()
   }
