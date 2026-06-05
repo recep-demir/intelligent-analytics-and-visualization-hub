@@ -92,7 +92,7 @@ async function aiQuery(question: string, token: string | null): Promise<ApiResul
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}/ai/query`, {
+  const res = await fetch(`${API_URL}/api/ai/query`, {
     method:  'POST',
     headers,
     body:    JSON.stringify({ nl: question }),
