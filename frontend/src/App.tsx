@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./index.css";
 
-const REAL_LABELS: Record<string, string> = {
-  "Cluster A": "Ontario",
-  "Cluster B": "Quebec",
-  "Cluster C": "British Columbia",
-  "Cluster D": "Alberta",
-};
-
 // Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
   chartType: "line" | "bar" | "pie" | "grid" | "heatmap" | "donut" | "map";
@@ -84,117 +77,21 @@ export default function App() {
 
       const rawData = await response.json();
 
-      const realProvincialData = [
-        { province: "Ontario", percentage: 42, value: 42000 },
-        { province: "Quebec", percentage: 28, value: 28000 },
-        { province: "British Columbia", percentage: 18, value: 18000 },
-        { province: "Alberta", percentage: 12, value: 12000 },
-      ];
-
-      let targetChartType =
-        rawData.chartConfig?.chartType ??
-        rawData.chartConfig?.charttype ??
-        "bar";
-
-      const lowerQuery = query.toLowerCase();
-      if (
-        lowerQuery.includes("proportion") ||
-        lowerQuery.includes("regional") ||
-        lowerQuery.includes("pie") ||
-        lowerQuery.includes("ratio") ||
-        lowerQuery.includes("share")
-      ) {
-        targetChartType = "pie";
-      } else if (
-        lowerQuery.includes("trend") ||
-        lowerQuery.includes("years") ||
-        lowerQuery.includes("over time") ||
-        lowerQuery.includes("line")
-      ) {
-        targetChartType = "line";
+      if (!Array.isArray(rawData.data) || rawData.data.length === 0) {
+        throw new Error("No data returned for this question. Try rephrasing.");
       }
 
       const mappedConfig: ChartConfig = {
-        chartType: targetChartType,
-        groupBy:
-          rawData.chartConfig?.groupBy ??
-          rawData.chartConfig?.groupby ??
-          (targetChartType === "line" ? "year" : "province"),
-        dataset:
-          rawData.chartConfig?.dataset ??
-          rawData.chartConfig?.dataSet ??
-          "tax_records",
+        chartType: rawData.chartConfig?.chartType ?? rawData.chartConfig?.charttype ?? "bar",
+        groupBy: rawData.chartConfig?.groupBy ?? rawData.chartConfig?.groupby ?? "",
+        dataset: rawData.chartConfig?.dataset ?? rawData.chartConfig?.dataSet ?? "",
         filters: rawData.chartConfig?.filters ?? [],
       };
-
-      const alternativeTimeData = [
-        { year: "2022", value: 32, percentage: 32 },
-        { year: "2023", value: 45, percentage: 45 },
-        { year: "2024", value: 58, percentage: 58 },
-        { year: "2025", value: 71, percentage: 71 },
-        { year: "2026", value: 88, percentage: 88 },
-      ];
-
-      const alternativeProvincialData = [
-        { province: "Ontario", percentage: 42, value: 42000 },
-        { province: "Quebec", percentage: 28, value: 28000 },
-        { province: "British Columbia", percentage: 18, value: 18000 },
-        { province: "Alberta", percentage: 12, value: 12000 },
-      ];
-
-      let absoluteDataPayload: any[] =
-        Array.isArray(rawData.data) && rawData.data.length > 0
-          ? rawData.data
-          : targetChartType === "line"
-            ? alternativeTimeData
-            : alternativeProvincialData;
-
-      if (mappedConfig.filters && mappedConfig.filters.length > 0) {
-        mappedConfig.filters.forEach(
-          (filter: { field: string; value: string; operator?: string }) => {
-            const filterField = filter.field.toLowerCase();
-            const filterValue = filter.value.trim().toLowerCase();
-
-            if (filterField === "province" || filterField === "region") {
-              absoluteDataPayload = absoluteDataPayload.filter(
-                (item: Record<string, any>) =>
-                  (item.province ?? item.region ?? "").toLowerCase() ===
-                  filterValue,
-              );
-            } else if (
-              filterField === "year" ||
-              filterField === "date" ||
-              filterField === "tax_year"
-            ) {
-              const targetYear = parseInt(filterValue, 10);
-              if (!isNaN(targetYear)) {
-                absoluteDataPayload = absoluteDataPayload.filter(
-                  (item: Record<string, any>) => {
-                    const rawItemYear =
-                      item.year ?? item.tax_year ?? item.date ?? "";
-                    const itemYear = parseInt(String(rawItemYear), 10);
-                    return !isNaN(itemYear) ? itemYear <= targetYear : true;
-                  },
-                );
-              } else {
-                absoluteDataPayload = absoluteDataPayload.filter(
-                  (item: Record<string, any>) => {
-                    const rawItemYear =
-                      item.year ?? item.tax_year ?? item.date ?? "";
-                    const yearString = String(rawItemYear).toLowerCase();
-                    return yearString.includes(filterValue);
-                  },
-                );
-              }
-            }
-          },
-        );
-      }
 
       setChartData({
         chartConfig: mappedConfig,
         fromCache: rawData.fromCache ?? false,
-        data: absoluteDataPayload,
+        data: rawData.data,
       });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
@@ -275,76 +172,62 @@ export default function App() {
                 </div>
 
                 {chartData.chartConfig.chartType === "pie" && (
-                  <div
-                    key="pie-chart-view"
-                    className="flex flex-col items-center py-2 w-full"
-                  >
-                    {/* Concentric Layered Donut Core Wheel */}
-                    <div className="relative w-32 h-32 mb-6 flex items-center justify-center filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.4)]">
-                      <div
-                        className="w-full h-full rounded-full transition-transform duration-300 hover:scale-105"
-                        style={{
-                          background:
-                            "conic-gradient(#3b82f6 0% 42%, #10b981 42% 70%, #6366f1 70% 88%, #f59e0b 88% 100%)",
-                          maskImage:
-                            "radial-gradient(circle 44px, transparent 100%, white 100%)",
-                          WebkitMaskImage:
-                            "radial-gradient(circle 44px, transparent 44px, white 45px)",
-                        }}
-                      ></div>
-                      {/* Interior Stats Center Capsule */}
-                      <div className="absolute w-20 h-20 rounded-full bg-gray-900 border border-gray-800/80 flex flex-col items-center justify-center shadow-inner"></div>
-                    </div>
+                  <div key="pie-chart-view" className="flex flex-col items-center py-2 w-full">
+                    {(() => {
+                      const records = chartData.data ?? [];
+                      const colors = ["#3b82f6", "#10b981", "#6366f1", "#f59e0b", "#ef4444", "#8b5cf6"];
+                      const total = records.reduce((sum: number, r: any) => sum + (r.percentage ?? r.value ?? 0), 0) || 1;
 
-                    {/* Grid Segment Badges */}
-                    <div className="w-full space-y-2.5 max-w-sm">
-                      {chartData.data?.map((record: any, i: number) => {
-                        const currentGroupBy =
-                          chartData.chartConfig.groupBy || "province";
-                        const rawLabel =
-                          record[currentGroupBy] ??
-                          record["province"] ??
-                          record["region"] ??
-                          record["year"] ??
-                          record["label"] ??
-                          record["name"] ??
-                          record["status"] ??
-                          `Item ${i + 1}`;
-                        const label = REAL_LABELS[rawLabel] ?? rawLabel;
-                        const value = record.percentage ?? record.value ?? 0;
-                        const displayValue =
-                          value >= 1000
-                            ? `CA$${(value / 1000).toFixed(1)}K`
-                            : `${value}%`;
+                      // Build dynamic conic-gradient from real data
+                      let cumulative = 0;
+                      const stops = records.map((r: any, i: number) => {
+                        const pct = ((r.percentage ?? r.value ?? 0) / total) * 100;
+                        const start = cumulative;
+                        cumulative += pct;
+                        return `${colors[i % colors.length]} ${start.toFixed(1)}% ${cumulative.toFixed(1)}%`;
+                      }).join(", ");
 
-                        const chartPalette = [
-                          "bg-blue-500",
-                          "bg-emerald-500",
-                          "bg-indigo-500",
-                          "bg-amber-500",
-                        ];
-                        const segmentColor =
-                          chartPalette[i % chartPalette.length];
+                      const getLabel = (r: any, i: number) =>
+                        r[chartData.chartConfig.groupBy ?? ""] ?? r.province ?? r.status ?? r.label ?? r.name ?? r.year ?? `Item ${i + 1}`;
 
-                        return (
-                          <div
-                            key={i}
-                            className="flex justify-between items-center text-xs font-mono p-1.5 rounded-lg hover:bg-gray-950/30 border border-transparent hover:border-gray-800/30 transition-all"
-                            title={`${label}: ${displayValue}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span
-                                className={`w-2.5 h-2.5 rounded-md shadow-sm ${segmentColor} shrink-0`}
-                              ></span>
-                              <span className="text-gray-300">{label}</span>
-                            </div>
-                            <span className="text-blue-400 font-bold bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/20">
-                              {displayValue}
-                            </span>
+                      const displayValue = (r: any) => {
+                        const v = r.percentage ?? r.value ?? 0;
+                        return v >= 1000 ? `CA$${(v / 1000).toFixed(1)}K` : `${v}%`;
+                      };
+
+                      return (
+                        <>
+                          <div className="relative w-32 h-32 mb-6 flex items-center justify-center filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.4)]">
+                            <div
+                              className="w-full h-full rounded-full transition-transform duration-300 hover:scale-105"
+                              style={{
+                                background: `conic-gradient(${stops})`,
+                                WebkitMaskImage: "radial-gradient(circle 44px, transparent 44px, white 45px)",
+                                maskImage: "radial-gradient(circle 44px, transparent 44px, white 45px)",
+                              }}
+                            />
+                            <div className="absolute w-20 h-20 rounded-full bg-gray-900 border border-gray-800/80 shadow-inner" />
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          <div className="w-full space-y-2.5 max-w-sm">
+                            {records.map((record: any, i: number) => (
+                              <div
+                                key={i}
+                                className="flex justify-between items-center text-xs font-mono p-1.5 rounded-lg hover:bg-gray-950/30 border border-transparent hover:border-gray-800/30 transition-all"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-2.5 h-2.5 rounded-md shadow-sm shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
+                                  <span className="text-gray-300">{getLabel(record, i)}</span>
+                                </div>
+                                <span className="text-blue-400 font-bold bg-blue-950/20 px-2 py-0.5 rounded border border-blue-900/20">
+                                  {displayValue(record)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
                 {chartData.chartConfig.chartType === "bar" && (
@@ -355,7 +238,7 @@ export default function App() {
                       return records.map((record: any, index: number) => {
                         const currentGroupBy =
                           chartData.chartConfig.groupBy || "province";
-                        const rawLabel =
+                        const label =
                           record[currentGroupBy] ??
                           record["province"] ??
                           record["region"] ??
@@ -363,7 +246,6 @@ export default function App() {
                           record["name"] ??
                           record["status"] ??
                           `Item ${index + 1}`;
-                        const label = REAL_LABELS[rawLabel] ?? rawLabel;
                         const value = record.percentage ?? record.value ?? 0;
                         const barWidth = Math.min((value / maxValue) * 100, 100);
                         const displayValue =

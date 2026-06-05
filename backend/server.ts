@@ -120,7 +120,7 @@ export async function startServer(): Promise<void> {
           lowerQuestion.includes("distribution")
         ) {
           const [rows] = await sequelize.query(
-            `SELECT status as province,
+            `SELECT status,
                     ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value
              FROM Orders GROUP BY status ORDER BY value DESC`
           );
