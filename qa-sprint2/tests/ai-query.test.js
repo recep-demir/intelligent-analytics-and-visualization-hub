@@ -200,7 +200,7 @@ describe("AI Query — Edge cases", () => {
     const { status, body } = await aiQuery("asdfghjklqwerty nonsense!!!!", adminToken);
 
     const acceptable = status === 400 || (status === 200 && body.chartConfig);
-    expect(acceptable).toBe(true);
+    expect(Boolean(acceptable)).toBe(true);
   });
 
   test("SQL injection attempt is handled safely", async () => {
