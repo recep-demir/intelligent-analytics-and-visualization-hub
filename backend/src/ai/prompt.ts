@@ -21,9 +21,10 @@ Rules:
 - Return ONLY valid JSON — no explanation, no markdown, no code fences.
 - Use only field names that exist in the schema provided by the user.
 - chartType must be one of: bar | line | grid | heatmap | pie | donut | map
-- operator must be one of: eq | gt | lt | contains
+- operator must be one of: = | eq | gt | lt | contains
 - If the question is ambiguous, default to chartType "bar" and no filters.
 - Never invent dataset names — use only what is in the schema.
+- If the user specifies a specific location or province (e.g., "Ontario"), you MUST populate the filters array using the "=" operator.
 
 Output format:
 {
@@ -33,7 +34,7 @@ Output format:
   "groupBy": "string — optional, field to group results by",
   "title": "string — short human-readable title for the chart"
 }
-`.trim()
+`.trim();
 
 // ---------------------------------------------------------------------------
 // User prompt — built fresh for every request.
@@ -48,19 +49,19 @@ Available dataset names (use exactly as written): tax_records, towns
 
 Convert this question into a ChartConfig JSON object:
 "${nl}"
-`.trim()
+`.trim();
 }
 
 // ---------------------------------------------------------------------------
 // Example questions — used in tests, spike, and documentation.
 // ---------------------------------------------------------------------------
 export const EXAMPLE_QUESTIONS = [
-  'Show me total tax collected by province as a bar chart',
-  'Show me tax revenue trends by year as a line chart',
-  'Show me tax breakdown by country as a pie chart',
-  'Show me tax collected in Canada only, grouped by province',
-  'Show me orders from Ontario in 2023',
-  'Show me cities where tax collected is greater than 500',
-  'Show me monthly tax trends for Canada as a line chart',
-  'Show me total tax by province on a map',
-]
+  "Show me total tax collected by province as a bar chart",
+  "Show me tax revenue trends by year as a line chart",
+  "Show me tax breakdown by country as a pie chart",
+  "Show me tax collected in Canada only, grouped by province",
+  "Show me orders from Ontario in 2023",
+  "Show me cities where tax collected is greater than 500",
+  "Show me monthly tax trends for Canada as a line chart",
+  "Show me total tax by province on a map",
+];

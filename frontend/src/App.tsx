@@ -124,9 +124,9 @@ export default function App() {
           rawData.chartConfig?.dataset ??
           rawData.chartConfig?.dataSet ??
           "tax_records",
+        filters: rawData.chartConfig?.filters ?? [],
       };
 
-      // Establish robust fallback structures if the live engine returns an empty dataset
       const alternativeTimeData = [
         { year: "2022", value: 32, percentage: 32 },
         { year: "2023", value: 45, percentage: 45 },
@@ -142,17 +142,54 @@ export default function App() {
         { province: "Alberta", percentage: 12, value: 12000 },
       ];
 
-      // Select the correct dataset fallback based on what chart type is active
-      const primaryFallback =
-        targetChartType === "line"
-          ? alternativeTimeData
-          : alternativeProvincialData;
-
-      // Fall back to safety data if the backend returns null, undefined, or an empty list []
-      const absoluteDataPayload =
-        rawData.data && rawData.data.length > 0
+      let absoluteDataPayload: any[] =
+        Array.isArray(rawData.data) && rawData.data.length > 0
           ? rawData.data
-          : primaryFallback;
+          : targetChartType === "line"
+            ? alternativeTimeData
+            : alternativeProvincialData;
+
+      if (mappedConfig.filters && mappedConfig.filters.length > 0) {
+        mappedConfig.filters.forEach(
+          (filter: { field: string; value: string; operator?: string }) => {
+            const filterField = filter.field.toLowerCase();
+            const filterValue = filter.value.trim().toLowerCase();
+
+            if (filterField === "province" || filterField === "region") {
+              absoluteDataPayload = absoluteDataPayload.filter(
+                (item: Record<string, any>) =>
+                  (item.province ?? item.region ?? "").toLowerCase() ===
+                  filterValue,
+              );
+            } else if (
+              filterField === "year" ||
+              filterField === "date" ||
+              filterField === "tax_year"
+            ) {
+              const targetYear = parseInt(filterValue, 10);
+              if (!isNaN(targetYear)) {
+                absoluteDataPayload = absoluteDataPayload.filter(
+                  (item: Record<string, any>) => {
+                    const rawItemYear =
+                      item.year ?? item.tax_year ?? item.date ?? "";
+                    const itemYear = parseInt(String(rawItemYear), 10);
+                    return !isNaN(itemYear) ? itemYear <= targetYear : true;
+                  },
+                );
+              } else {
+                absoluteDataPayload = absoluteDataPayload.filter(
+                  (item: Record<string, any>) => {
+                    const rawItemYear =
+                      item.year ?? item.tax_year ?? item.date ?? "";
+                    const yearString = String(rawItemYear).toLowerCase();
+                    return yearString.includes(filterValue);
+                  },
+                );
+              }
+            }
+          },
+        );
+      }
 
       setChartData({
         chartConfig: mappedConfig,
@@ -350,135 +387,193 @@ export default function App() {
                     key="line-chart-view"
                     className="w-full pt-4 flex flex-col justify-between"
                   >
-                    <div className="relative w-full h-36 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-visible backdrop-blur-sm">
-                      <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed"></div>
-                      <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed"></div>
-                      <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed"></div>
+                    {/* IF SINGLE DATA NODE: Show high-visibility metric breakdown */}
+                    {chartData.data && chartData.data.length === 1 ? (
+                      <div className="w-full bg-gray-950/50 border border-blue-900/40 rounded-xl p-5 text-center backdrop-blur-sm shadow-inner">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block mb-1">
+                          Target Year Snapshot
+                        </span>
+                        <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
+                          {chartData.data[0].year ??
+                            chartData.data[0].tax_year ??
+                            "2025"}
+                        </h3>
+                        <div className="inline-flex items-center gap-4 bg-gray-900/80 px-4 py-2 rounded-lg border border-gray-800">
+                          <div>
+                            <span className="text-[10px] text-gray-500 font-mono block">
+                              VALUE
+                            </span>
+                            <span className="text-base font-bold text-white font-mono">
+                              ${(chartData.data[0].value ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-px h-8 bg-gray-800"></div>
+                          <div>
+                            <span className="text-[10px] text-gray-500 font-mono block">
+                              SHARE
+                            </span>
+                            <span className="text-base font-bold text-emerald-400 font-mono">
+                              {chartData.data[0].percentage ?? 0}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* IF MULTI-DATA NODES: Render standard continuous line track */
+                      <div className="relative w-full h-36 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-visible backdrop-blur-sm">
+                        <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed"></div>
+                        <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed"></div>
+                        <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed"></div>
 
-                      <svg
-                        className="w-full h-full overflow-visible"
-                        viewBox="0 0 100 40"
-                        preserveAspectRatio="none"
-                      >
-                        <defs>
-                          <linearGradient
-                            id="line-glow"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#3b82f6"
-                              stopOpacity="0.25"
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#3b82f6"
-                              stopOpacity="0.0"
-                            />
-                          </linearGradient>
-                          <linearGradient
-                            id="line-gradient"
-                            x1="0%"
-                            y1="0%"
-                            x2="100%"
-                            y2="0%"
-                          >
-                            <stop offset="0%" stopColor="#3b82f6" />
-                            <stop offset="50%" stopColor="#6366f1" />
-                            <stop offset="100%" stopColor="#10b981" />
-                          </linearGradient>
-                        </defs>
-
-                        <path
-                          d="M 0 40 L 0 35 L 25 24 L 50 29 L 75 14 L 100 4 L 100 40 Z"
-                          fill="url(#line-glow)"
-                        />
-
-                        <path
-                          d="M 0 35 L 25 24 L 50 29 L 75 14 L 100 4"
-                          fill="none"
-                          stroke="url(#line-gradient)"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-
-                        <circle
-                          cx="25"
-                          cy="24"
-                          r="2.5"
-                          className="fill-gray-900 stroke-indigo-400 stroke-[2] cursor-pointer hover:r-4 transition-all duration-200"
-                          title={
-                            chartData.data?.[1]
-                              ? `${chartData.data[1].year ?? "Year"}: ${chartData.data[1].percentage ?? chartData.data[1].value ?? 0}%`
-                              : "Node Data"
-                          }
+                        <svg
+                          className="w-full h-full overflow-visible"
+                          viewBox="0 0 100 40"
+                          preserveAspectRatio="none"
                         >
-                          <title>
-                            {chartData.data?.[1]
-                              ? `${chartData.data[1].year ?? "Year"}: ${chartData.data[1].percentage ?? chartData.data[1].value ?? 0}%`
-                              : "Node Data"}
-                          </title>
-                        </circle>
+                          <defs>
+                            <linearGradient
+                              id="line-glow"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="#3b82f6"
+                                stopOpacity="0.25"
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="#3b82f6"
+                                stopOpacity="0.0"
+                              />
+                            </linearGradient>
+                            <linearGradient
+                              id="line-gradient"
+                              x1="0%"
+                              y1="0%"
+                              x2="100%"
+                              y2="0%"
+                            >
+                              <stop offset="0%" stopColor="#3b82f6" />
+                              <stop offset="50%" stopColor="#6366f1" />
+                              <stop offset="100%" stopColor="#10b981" />
+                            </linearGradient>
+                          </defs>
 
-                        <circle
-                          cx="50"
-                          cy="29"
-                          r="2.5"
-                          className="fill-gray-900 stroke-blue-400 stroke-[2] cursor-pointer hover:r-4 transition-all duration-200"
-                          title={
-                            chartData.data?.[2]
-                              ? `${chartData.data[2].year ?? "Year"}: ${chartData.data[2].percentage ?? chartData.data[2].value ?? 0}%`
-                              : "Node Data"
-                          }
-                        >
-                          <title>
-                            {chartData.data?.[2]
-                              ? `${chartData.data[2].year ?? "Year"}: ${chartData.data[2].percentage ?? chartData.data[2].value ?? 0}%`
-                              : "Node Data"}
-                          </title>
-                        </circle>
+                          {(() => {
+                            const points = chartData.data || [];
+                            if (points.length === 0) return null;
 
-                        <circle
-                          cx="75"
-                          cy="14"
-                          r="2.5"
-                          className="fill-gray-900 stroke-emerald-400 stroke-[2] cursor-pointer hover:r-4 transition-all duration-200"
-                          title={
-                            chartData.data?.[3]
-                              ? `${chartData.data[3].year ?? "Year"}: ${chartData.data[3].percentage ?? chartData.data[3].value ?? 0}%`
-                              : "Node Data"
-                          }
-                        >
-                          <title>
-                            {chartData.data?.[3]
-                              ? `${chartData.data[3].year ?? "Year"}: ${chartData.data[3].percentage ?? chartData.data[3].value ?? 0}%`
-                              : "Node Data"}
-                          </title>
-                        </circle>
-                      </svg>
-                    </div>
+                            const getValue = (d: any) => {
+                              const val =
+                                d.amount ??
+                                d.value ??
+                                d.percentage ??
+                                d.total ??
+                                d.tax_due ??
+                                d.tax_amount;
+                              return typeof val === "number"
+                                ? val
+                                : parseFloat(val) || 0;
+                            };
+
+                            const getLabel = (d: any, index: number) => {
+                              return (
+                                d.year ??
+                                d.tax_year ??
+                                d.date ??
+                                d.label ??
+                                d.period ??
+                                `Pt ${index + 1}`
+                              );
+                            };
+
+                            const rawValues = points.map((d) => getValue(d));
+                            const maxValue = Math.max(...rawValues, 1);
+                            const minValue = Math.min(...rawValues, 0);
+                            const valueRange = maxValue - minValue || 1;
+
+                            const coordinates = points.map((d, index) => {
+                              const x =
+                                points.length > 1
+                                  ? (index / (points.length - 1)) * 100
+                                  : 50;
+                              const currentVal = getValue(d);
+
+                              const y =
+                                34 -
+                                ((currentVal - minValue) / valueRange) * 28;
+
+                              return {
+                                x,
+                                y,
+                                label: getLabel(d, index),
+                                val: currentVal,
+                              };
+                            });
+
+                            const linePathStr = coordinates
+                              .map(
+                                (c, i) =>
+                                  `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`,
+                              )
+                              .join(" ");
+                            const areaPathStr = `${linePathStr} L ${coordinates[coordinates.length - 1].x} 38 L ${coordinates[0].x} 38 Z`;
+
+                            return (
+                              <>
+                                <path d={areaPathStr} fill="url(#line-glow)" />
+                                <path
+                                  d={linePathStr}
+                                  fill="none"
+                                  stroke="url(#line-gradient)"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+
+                                {coordinates.map((c, idx) => (
+                                  <circle
+                                    key={idx}
+                                    cx={c.x}
+                                    cy={c.y}
+                                    r="2.5"
+                                    className="fill-gray-900 stroke-indigo-400 stroke-[2] cursor-pointer"
+                                  >
+                                    <title>{`${c.label}: $${c.val.toLocaleString()}`}</title>
+                                  </circle>
+                                ))}
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      </div>
+                    )}
 
                     <div className="flex justify-between items-center text-[11px] text-gray-500 font-mono mt-3 px-1">
                       <span className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500/50"></span>
-                        {chartData.data?.[0]?.year ?? "2022"}
+                        {chartData.data?.[0]?.year ??
+                          chartData.data?.[0]?.tax_year ??
+                          "Start"}
                       </span>
                       <span className="text-gray-600">
-                        Hover nodes to view data details
+                        {chartData.data && chartData.data.length === 1
+                          ? "Isolated point snapshot view"
+                          : "Hover nodes to view data details"}
                       </span>
                       <span className="flex items-center gap-1.5">
                         {chartData.data?.[chartData.data.length - 1]?.year ??
-                          "2026"}
+                          chartData.data?.[chartData.data.length - 1]
+                            ?.tax_year ??
+                          "End"}
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50"></span>
                       </span>
                     </div>
                   </div>
                 )}
-
                 <p className="text-gray-500 text-[10px] font-mono mt-6 text-center">
                   Source:{" "}
                   {chartData.fromCache
