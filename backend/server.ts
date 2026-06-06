@@ -75,104 +75,89 @@ export async function startServer(): Promise<void> {
         )) as any;
         console.log("🧠 Generated AI Metadata & Query:", aiResult);
 
-        const targetGraphQLQuery = aiResult?.query || aiResult?.graphql;
-        let liveDbRecords: any[] = [];
+        const chartConfig = aiResult?.chartConfig ?? {};
+        const filters: any[] = chartConfig.filters ?? [];
+        const groupBy: string = (chartConfig.groupBy ?? "").toLowerCase();
+        const lowerQuestion = question.toLowerCase();
 
-        if (targetGraphQLQuery) {
-          console.log(`🔌 Executing AI-generated GraphQL query on Database...`);
+        // Extract year(s) from filters or question
+        const yearFilter = filters.find((f: any) =>
+          f.field?.toLowerCase().includes("year") ||
+          f.field?.toLowerCase().includes("createdat")
+        );
+        const allYearsInQuestion = question.match(/\b(20\d{2})\b/g) ?? [];
+        const targetYear: string | null = yearFilter?.value
+          ? String(yearFilter.value).trim()
+          : allYearsInQuestion.length === 1 ? allYearsInQuestion[0] ?? null : null;
+        const yearRangeStart: string | null = allYearsInQuestion.length >= 2 ? allYearsInQuestion[0] ?? null : null;
+        const yearRangeEnd: string | null = allYearsInQuestion.length >= 2 ? allYearsInQuestion[allYearsInQuestion.length - 1] ?? null : null;
 
-          const executeResponse = await server.executeOperation({
-            query: targetGraphQLQuery,
-            variables: aiResult?.variables ?? {},
-          });
+        let finalDataPayload: any[] = [];
 
-          if (
-            executeResponse.body.kind === "single" &&
-            "data" in executeResponse.body.singleResult
-          ) {
-            const queryData = executeResponse.body.singleResult.data;
-
-            if (queryData) {
-              const rootKey = Object.keys(queryData)[0];
-              if (rootKey && Array.isArray(queryData[rootKey])) {
-                liveDbRecords = queryData[rootKey];
-              } else {
-                liveDbRecords = Object.values(queryData);
-              }
-            }
+        // Revenue by year — line / trend questions
+        if (
+          groupBy.includes("year") ||
+          lowerQuestion.includes("trend") ||
+          lowerQuestion.includes("over time") ||
+          lowerQuestion.includes("over the years") ||
+          lowerQuestion.includes("years")
+        ) {
+          let sql = `SELECT strftime('%Y', createdAt) as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+          if (yearRangeStart && yearRangeEnd) {
+            sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
+          } else if (targetYear) {
+            sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
           }
+          sql += ` GROUP BY year ORDER BY year`;
+          const [rows] = await sequelize.query(sql);
+          finalDataPayload = rows as any[];
+          console.log(`📊 Revenue by year (${finalDataPayload.length} rows)`);
 
-          if (
-            executeResponse.body.kind === "single" &&
-            executeResponse.body.singleResult.errors
-          ) {
-            console.error(
-              "⚠️ GraphQL Execution Errors:",
-              executeResponse.body.singleResult.errors,
-            );
-          }
-        }
-
-        // --- FILTER INTERCEPTOR FOR FALLBACK DATA ---
-        let finalDataPayload = liveDbRecords;
-
-        const rawChartType =
-          aiResult?.chartConfig?.chartType ?? aiResult?.chartType ?? "bar";
-        const isLineChart =
-          rawChartType === "line" ||
-          question.toLowerCase().includes("trend") ||
-          question.toLowerCase().includes("over time");
-
-        if (!finalDataPayload || finalDataPayload.length === 0) {
-          const alternativeTimeData = [
-            { year: "2022", value: 32, percentage: 32 },
-            { year: "2023", value: 45, percentage: 45 },
-            { year: "2024", value: 58, percentage: 58 },
-            { year: "2025", value: 71, percentage: 71 },
-            { year: "2026", value: 88, percentage: 88 },
-          ];
-
-          const alternativeProvincialData = [
-            { province: "Ontario", percentage: 42, value: 42000 },
-            { province: "Quebec", percentage: 28, value: 28000 },
-            { province: "British Columbia", percentage: 18, value: 18000 },
-            { province: "Alberta", percentage: 12, value: 12000 },
-          ];
-
-          let fallbackData: any[] = isLineChart
-            ? alternativeTimeData
-            : alternativeProvincialData;
-
-          const filters =
-            aiResult?.chartConfig?.filters ?? aiResult?.filters ?? [];
-          const yearFilter = filters.find(
-            (f: any) =>
-              f.field?.toLowerCase() === "year" ||
-              f.field?.toLowerCase() === "tax_year",
+        // Orders by status — breakdown / pie questions
+        } else if (
+          lowerQuestion.includes("status") ||
+          lowerQuestion.includes("breakdown") ||
+          lowerQuestion.includes("distribution")
+        ) {
+          const [rows] = await sequelize.query(
+            `SELECT status,
+                    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value
+             FROM Orders GROUP BY status ORDER BY value DESC`
           );
+          finalDataPayload = rows as any[];
+          console.log(`📊 Orders by status (${finalDataPayload.length} rows)`);
 
-          if (yearFilter && yearFilter.value) {
-            const targetYearStr = String(yearFilter.value).trim();
-            fallbackData = fallbackData.filter(
-              (item: any) => String(item.year).trim() === targetYearStr,
-            );
-          } else {
-            const yearMatch = question.match(/\b(202\d)\b/);
-            if (yearMatch) {
-              const targetYearStr = yearMatch[1];
-              fallbackData = fallbackData.filter(
-                (item: any) => String(item.year).trim() === targetYearStr,
-              );
-            }
-          }
+        // Revenue by product group
+        } else if (
+          lowerQuestion.includes("product group") ||
+          lowerQuestion.includes("product groups") ||
+          groupBy.includes("group")
+        ) {
+          const [rows] = await sequelize.query(
+            `SELECT pg.name as label, ROUND(SUM(oi.price * oi.quantity), 2) as value
+             FROM OrderItems oi
+             JOIN Products p ON oi.productId = p.id
+             JOIN ProductGroups pg ON p.groupId = pg.id
+             GROUP BY pg.name ORDER BY value DESC LIMIT 10`
+          );
+          finalDataPayload = rows as any[];
+          console.log(`📊 Revenue by product group (${finalDataPayload.length} rows)`);
 
-          finalDataPayload = fallbackData;
+        // Revenue by province — default bar chart
+        } else {
+          let sql = `SELECT a.province, ROUND(SUM(o.subtotal), 2) as value
+                     FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
+          if (targetYear) sql += ` WHERE strftime('%Y', o.createdAt) = '${targetYear}'`;
+          sql += ` GROUP BY a.province ORDER BY value DESC LIMIT 10`;
+          const [rows] = await sequelize.query(sql);
+          finalDataPayload = rows as any[];
+          console.log(`📊 Revenue by province (${finalDataPayload.length} rows)`);
         }
 
         return res.status(200).json({
           chartConfig: aiResult?.chartConfig ?? {
-            chartType: rawChartType,
-            filters: aiResult?.chartConfig?.filters ?? aiResult?.filters ?? [],
+            chartType: chartConfig.chartType ?? "bar",
+            filters,
           },
           fromCache: aiResult?.fromCache ?? false,
           data: finalDataPayload,
