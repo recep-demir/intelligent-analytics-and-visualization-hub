@@ -69,63 +69,40 @@ export async function startServer(): Promise<void> {
 
         const lowerQuestion = question.toLowerCase();
 
-        // Match query types instantly to prevent heavy network adapter timeouts
-        let dynamicChartType = "bar";
-        let isMatch = false;
-
-        if (
-          lowerQuestion.includes("trend") ||
-          lowerQuestion.includes("over time") ||
-          lowerQuestion.includes("over the years") ||
-          lowerQuestion.includes("years") ||
-          lowerQuestion.includes("changed")
-        ) {
-          dynamicChartType = "line";
-          isMatch = true;
-        } else if (
-          lowerQuestion.includes("status") ||
-          lowerQuestion.includes("breakdown") ||
-          lowerQuestion.includes("distribution") ||
-          lowerQuestion.includes("split") ||
-          lowerQuestion.includes("category")
-        ) {
-          dynamicChartType = "pie";
-          isMatch = true;
-        } else if (
-          lowerQuestion.includes("product group") ||
-          lowerQuestion.includes("product groups") ||
-          lowerQuestion.includes("province") ||
-          lowerQuestion.includes("shipped")
-        ) {
-          dynamicChartType = "bar";
-          isMatch = true;
-        } else if (
-          lowerQuestion.includes("revenue") ||
-          lowerQuestion.includes("total") ||
-          lowerQuestion.includes("sum")
-        ) {
-          dynamicChartType = "bar";
-          isMatch = true;
+        // --- Step 1: Always call the AI adapter first ---
+        let aiResult: any = null;
+        try {
+          const schemaSdl = print(typeDefs);
+          aiResult = await Promise.race([
+            adapter.resolve({ nl: question }, schemaSdl),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Timeout")), 5000),
+            ),
+          ]);
+        } catch (e) {
+          console.log("⚠️ AI Engine failed or timed out:", e);
         }
 
-        let aiResult: any = null;
-
-        // Only trigger the external adapter if it's an unmapped or dynamic scenario
-        if (!isMatch && lowerQuestion.length < 200) {
+        // --- Step 1b: If primary adapter failed, fall back to LocalEngine ---
+        if (!aiResult) {
           try {
-            const schemaSdl = print(typeDefs);
-            aiResult = await Promise.race([
-              adapter.resolve({ nl: question }, schemaSdl),
-              new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout")), 1500),
-              ),
-            ]);
+            const fallback = new LocalEngine();
+            const fallbackConfig = await fallback.resolve(question, "");
+            aiResult = { chartConfig: fallbackConfig, fromCache: false };
+            console.log(
+              "🔄 LocalEngine fallback produced:",
+              fallbackConfig.chartType,
+              fallbackConfig.groupBy,
+            );
           } catch (e) {
-            console.log("⚠️ AI Engine fallback activated or timed out");
+            console.log("⚠️ LocalEngine fallback also failed");
           }
         }
 
+        // --- Step 2: Derive chartType and groupBy from AI result ---
         const chartConfig = aiResult?.chartConfig ?? {};
+        let dynamicChartType: string = chartConfig.chartType ?? "bar";
+        const groupBy: string | undefined = chartConfig.groupBy;
         let filters: any[] = chartConfig.filters ?? [];
 
         // Extract potential target year safely
@@ -155,97 +132,101 @@ export async function startServer(): Promise<void> {
           }
         }
 
-        // Dynamic injection of the year filter for chronological scopes
-        if (lowerQuestion.includes("2023") || targetYear === "2023") {
-          if (
-            !filters.some(
-              (f) =>
-                String(f.field).toLowerCase().includes("createdat") ||
-                String(f.field).toLowerCase().includes("year"),
-            )
-          ) {
-            filters.push({ field: "createdAt", operator: "=", value: "2023" });
-          }
-        }
-
         let finalDataPayload: any[] = [];
 
-        // Isolated execution layer matching front-end Year Snapshot specifications
+        // --- Step 4: Build and execute SQL driven by AI-determined chartType + groupBy ---
         try {
           if (dynamicChartType === "line") {
-            let sql = `SELECT strftime('%Y', createdAt) as year, strftime('%Y', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
-            if (yearRangeStart && yearRangeEnd) {
-              sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
-            } else if (targetYear) {
-              sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
-            }
-            sql += ` GROUP BY year ORDER BY year`;
-            const [rows] = await sequelize.query(sql);
-            finalDataPayload = rows as any[];
-          } else if (dynamicChartType === "pie") {
-            const [rows] = await sequelize.query(
-              `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC`,
-            );
-            finalDataPayload = rows as any[];
-          } else if (
-            lowerQuestion.includes("product group") ||
-            lowerQuestion.includes("product groups")
-          ) {
-            try {
-              const [rows] = await sequelize.query(
-                `SELECT pg.name as label, pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT 10`,
-              );
+            if (groupBy === "month") {
+              let sql = `SELECT strftime('%m', createdAt) as month, strftime('%m', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              if (targetYear) {
+                sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+              }
+              sql += ` GROUP BY month ORDER BY month`;
+              const [rows] = await sequelize.query(sql);
               finalDataPayload = rows as any[];
-            } catch {
-              const [rows] = await sequelize.query(
-                `SELECT p.name as label, p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT 10`,
-              );
-              finalDataPayload = rows as any[];
-            }
-          } else if (
-            lowerQuestion.includes("revenue") ||
-            lowerQuestion.includes("total") ||
-            lowerQuestion.includes("sum")
-          ) {
-            // Fixes the blank dash by passing the year into the SQL selection fields
-            const labelName = targetYear ? targetYear : "Total Revenue";
-
-            let sql = `SELECT '${labelName}' as name, '${labelName}' as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
-            if (targetYear) {
-              sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
-            }
-            const [rows] = await sequelize.query(sql);
-            finalDataPayload = rows as any[];
-
-            // CRITICAL FIX: If an exact target year is isolated, override the chartType to "line".
-            // This forces the frontend to mount the 'YEAR SNAPSHOT' template container instead of a bar layout.
-            if (targetYear) {
-              dynamicChartType = "line";
             } else {
-              dynamicChartType = "bar";
+              // Default line: group by year
+              let sql = `SELECT strftime('%Y', createdAt) as year, strftime('%Y', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              if (yearRangeStart && yearRangeEnd) {
+                sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
+              } else if (targetYear) {
+                sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+              }
+              sql += ` GROUP BY year ORDER BY year`;
+              const [rows] = await sequelize.query(sql);
+              finalDataPayload = rows as any[];
+            }
+          } else if (
+            dynamicChartType === "pie" ||
+            dynamicChartType === "donut"
+          ) {
+            if (groupBy === "category") {
+              // Revenue by product category
+              try {
+                const [rows] = await sequelize.query(
+                  `SELECT pc.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId JOIN ProductCategories pc ON pgc.categoryId = pc.id GROUP BY pc.name ORDER BY value DESC`,
+                );
+                finalDataPayload = rows as any[];
+              } catch {
+                const [rows] = await sequelize.query(
+                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC`,
+                );
+                finalDataPayload = rows as any[];
+              }
+            } else {
+              // Default pie: order status distribution
+              const [rows] = await sequelize.query(
+                `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC`,
+              );
+              finalDataPayload = rows as any[];
             }
           } else {
-            let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
-            const replacements: any = {};
+            // Bar chart and other types
+            if (groupBy === "month") {
+              let sql = `SELECT strftime('%m', createdAt) as month, strftime('%m', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              if (targetYear) {
+                sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+              }
+              sql += ` GROUP BY month ORDER BY month`;
+              const [rows] = await sequelize.query(sql);
+              finalDataPayload = rows as any[];
+            } else if (groupBy === "productGroup" || groupBy === "category") {
+              // Product group / category bar chart
+              try {
+                const [rows] = await sequelize.query(
+                  `SELECT pg.name as label, pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT 10`,
+                );
+                finalDataPayload = rows as any[];
+              } catch {
+                const [rows] = await sequelize.query(
+                  `SELECT p.name as label, p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT 10`,
+                );
+                finalDataPayload = rows as any[];
+              }
+            } else {
+              // Default bar: revenue by province
+              let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
+              const replacements: any = {};
 
-            if (targetYear) {
-              sql += ` WHERE strftime('%Y', o.createdAt) = :targetYear`;
-              replacements.targetYear = targetYear;
+              if (targetYear) {
+                sql += ` WHERE strftime('%Y', o.createdAt) = :targetYear`;
+                replacements.targetYear = targetYear;
+              }
+
+              sql += ` GROUP BY a.province ORDER BY value DESC LIMIT 10`;
+
+              const [rows] = await sequelize.query(sql, { replacements });
+              finalDataPayload = rows as any[];
             }
-
-            sql += ` GROUP BY a.province ORDER BY value DESC LIMIT 10`;
-
-            const [rows] = await sequelize.query(sql, { replacements });
-            finalDataPayload = rows as any[];
           }
         } catch (dbError) {
           console.log("⚠️ DB Query Fallback executed:", dbError);
           finalDataPayload = [{ label: "Data", name: "Data", value: 100 }];
         }
-        const isFromCache =
-          lowerQuestion.includes("province") && finalDataPayload.length > 0;
+        const isFromCache = aiResult?.fromCache ?? false;
         const computedGroupBy =
-          chartConfig.groupBy ||
+          groupBy ||
           (dynamicChartType === "pie"
             ? "status"
             : dynamicChartType === "line"
