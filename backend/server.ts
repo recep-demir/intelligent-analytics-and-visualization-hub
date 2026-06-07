@@ -212,6 +212,17 @@ export async function startServer(): Promise<void> {
                 `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC LIMIT ${limit}`,
               );
               finalDataPayload = rows as any[];
+            } else if (groupBy === "total") {
+              // Single aggregate — no grouping
+              const labelName = targetYear ?? "Total Revenue";
+              let sql = `SELECT '${labelName}' as name, '${labelName}' as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              if (targetYear) {
+                sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
+              }
+              const [rows] = await sequelize.query(sql);
+              finalDataPayload = rows as any[];
+              // Force line chartType so frontend renders the snapshot card
+              dynamicChartType = "line";
             } else {
               // Default: revenue by province
               let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;

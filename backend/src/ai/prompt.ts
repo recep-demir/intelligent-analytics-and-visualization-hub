@@ -43,6 +43,7 @@ Key relationships:
   "productGroup"  – group by product group   (via ProductGroups — e.g. TrailBlazer, SpeedRunner)
   "product"       – group by individual product name (via Products)
   "status"        – group by order status
+  "total"         – no grouping; return a single aggregate sum (for "total revenue", "sum of revenue")
 
 ## chartType selection guide
 
@@ -69,6 +70,7 @@ Key relationships:
 - Words like "category", "categories", or "product category" → groupBy "category".
 - Words like "product group" or "product groups" → groupBy "productGroup".
 - Words like "product" or "products" (without "group" or "category") → groupBy "product".
+- Words like "total revenue", "sum of revenue", or any aggregate without a grouping dimension → groupBy "total".
 - If the user asks for "top N", "N best", "bottom N", "N worst", "largest N", or "smallest N", set "limit" to that number N.
 
 Output format:
@@ -76,7 +78,7 @@ Output format:
   "chartType": "<one of bar|line|grid|heatmap|pie|donut|map>",
   "dataset": "Orders",
   "filters": [{ "field": "string", "operator": "eq|gt|lt|contains", "value": "string" }],
-  "groupBy": "<one of province|month|year|category|productGroup|product|status>",
+  "groupBy": "<one of province|month|year|category|productGroup|product|status|total>",
   "limit": "number — optional, max rows to return (e.g. 5 for 'top 5')",
   "title": "string — short human-readable title for the chart"
 }

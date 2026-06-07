@@ -56,6 +56,7 @@ export class LocalEngine implements AIEngine {
     if (q.includes("categor")) return "category";
     if (q.includes("product")) return "product";
     if (q.includes("status")) return "status";
+    if (/\btotal\b/.test(q) || /\bsum\b/.test(q)) return "total";
     return undefined;
   }
 
