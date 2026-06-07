@@ -47,7 +47,7 @@ Key relationships:
 ## chartType selection guide
 
   "pie" or "donut" – proportional / percentage questions (split, breakdown, distribution, share)
-  "line"           – time-series / trend questions (trend, over time, changed, over the years)
+  "line"           – time-series / trend questions (trend, over time, changed, over the years, monthly)
   "bar"            – ranking / comparison questions (top, by province, by product group)
   "grid"           – tabular / list questions
   "map"            – geographic questions explicitly asking for a map
@@ -64,8 +64,8 @@ Key relationships:
 - If the user mentions a province or location, add a filter with operator "eq".
 - If the question is ambiguous, default to chartType "bar" and groupBy "province".
 - Words like "split", "breakdown", "distribution", "share" → chartType "pie".
-- Words like "trend", "over time", "changed", "over the years" → chartType "line".
-- Words like "monthly" or "by month" → groupBy "month".
+- Words like "trend", "over time", "changed", "over the years", "monthly" → chartType "line".
+- Words like "monthly" or "by month" → chartType "line" AND groupBy "month".
 - Words like "category", "categories", or "product category" → groupBy "category".
 - Words like "product group" or "product groups" → groupBy "productGroup".
 - Words like "product" or "products" (without "group" or "category") → groupBy "product".

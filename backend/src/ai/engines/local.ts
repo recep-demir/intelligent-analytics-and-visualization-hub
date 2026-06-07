@@ -33,7 +33,8 @@ export class LocalEngine implements AIEngine {
       q.includes("trend") ||
       q.includes("over time") ||
       q.includes("over the years") ||
-      q.includes("changed")
+      q.includes("changed") ||
+      q.includes("monthly")
     )
       return "line";
     if (q.includes("table") || q.includes("list")) return "grid";

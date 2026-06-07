@@ -41,9 +41,11 @@ export async function startServer(): Promise<void> {
     const { server, typeDefs } = await createApolloServer();
     await server.start();
 
+    const engineName = process.env.GEMINI_API_KEY ? "Gemini" : "Local";
     const engine = process.env.GEMINI_API_KEY
       ? new GeminiEngine(process.env.GEMINI_API_KEY)
       : new LocalEngine();
+    console.log(`🧠 AI Engine: ${engineName}`);
 
     const adapter = new AIAdapter(engine);
 
@@ -79,8 +81,13 @@ export async function startServer(): Promise<void> {
               setTimeout(() => reject(new Error("Timeout")), 5000),
             ),
           ]);
+          console.log(
+            `✅ ${engineName} resolved:`,
+            aiResult?.chartConfig?.chartType,
+            aiResult?.chartConfig?.groupBy,
+          );
         } catch (e) {
-          console.log("⚠️ AI Engine failed or timed out:", e);
+          console.log(`⚠️ ${engineName} failed or timed out:`, e);
         }
 
         // --- Step 1b: If primary adapter failed, fall back to LocalEngine ---
@@ -135,11 +142,14 @@ export async function startServer(): Promise<void> {
 
         let finalDataPayload: any[] = [];
 
+        // SQLite CASE expression to convert month numbers to abbreviated names
+        const monthNameCase = `CASE strftime('%m', createdAt) WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar' WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun' WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep' WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec' END`;
+
         // --- Step 4: Build and execute SQL driven by AI-determined chartType + groupBy ---
         try {
           if (dynamicChartType === "line") {
             if (groupBy === "month") {
-              let sql = `SELECT strftime('%m', createdAt) as month, strftime('%m', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
                 sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
               }
@@ -161,7 +171,7 @@ export async function startServer(): Promise<void> {
           } else {
             // Bar, pie, donut, and other non-line types — SQL driven by groupBy
             if (groupBy === "month") {
-              let sql = `SELECT strftime('%m', createdAt) as month, strftime('%m', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
+              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
                 sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
               }
