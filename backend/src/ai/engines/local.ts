@@ -13,6 +13,7 @@ export class LocalEngine implements AIEngine {
       filters: this.detectFilters(q),
       groupBy: this.detectGroupBy(q),
       title: nl,
+      limit: this.detectLimit(q),
     };
   }
 
@@ -51,7 +52,8 @@ export class LocalEngine implements AIEngine {
     if (q.includes("country")) return "country";
     if (q.includes("year")) return "year";
     if (q.includes("month")) return "month";
-    if (q.includes("category")) return "category";
+    if (q.includes("categor")) return "category";
+    if (q.includes("product")) return "product";
     if (q.includes("status")) return "status";
     return undefined;
   }
@@ -98,6 +100,22 @@ export class LocalEngine implements AIEngine {
       filters.push({ field: "year", operator: "eq", value: yearMatch[1] });
 
     return filters;
+  }
+
+  private detectLimit(q: string): number | undefined {
+    // Matches patterns like "top 5", "bottom 10", "5 best", "3 worst",
+    // "largest 7", "smallest 4"
+    const prefixPattern = /\b(?:top|bottom|largest|smallest)\s+(\d+)\b/;
+    const suffixPattern =
+      /\b(\d+)\s+(?:best|worst|top|bottom|largest|smallest)\b/;
+
+    const prefixMatch = q.match(prefixPattern);
+    if (prefixMatch) return parseInt(prefixMatch[1], 10);
+
+    const suffixMatch = q.match(suffixPattern);
+    if (suffixMatch) return parseInt(suffixMatch[1], 10);
+
+    return undefined;
   }
 
   private toTitleCase(str: string): string {

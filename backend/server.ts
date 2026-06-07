@@ -99,10 +99,11 @@ export async function startServer(): Promise<void> {
           }
         }
 
-        // --- Step 2: Derive chartType and groupBy from AI result ---
+        // --- Step 2: Derive chartType, groupBy, and limit from AI result ---
         const chartConfig = aiResult?.chartConfig ?? {};
         let dynamicChartType: string = chartConfig.chartType ?? "bar";
         const groupBy: string | undefined = chartConfig.groupBy;
+        const limit: number = chartConfig.limit ?? 10;
         let filters: any[] = chartConfig.filters ?? [];
 
         // Extract potential target year safely
@@ -157,32 +158,8 @@ export async function startServer(): Promise<void> {
               const [rows] = await sequelize.query(sql);
               finalDataPayload = rows as any[];
             }
-          } else if (
-            dynamicChartType === "pie" ||
-            dynamicChartType === "donut"
-          ) {
-            if (groupBy === "category") {
-              // Revenue by product category
-              try {
-                const [rows] = await sequelize.query(
-                  `SELECT pc.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId JOIN ProductCategories pc ON pgc.categoryId = pc.id GROUP BY pc.name ORDER BY value DESC`,
-                );
-                finalDataPayload = rows as any[];
-              } catch {
-                const [rows] = await sequelize.query(
-                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC`,
-                );
-                finalDataPayload = rows as any[];
-              }
-            } else {
-              // Default pie: order status distribution
-              const [rows] = await sequelize.query(
-                `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC`,
-              );
-              finalDataPayload = rows as any[];
-            }
           } else {
-            // Bar chart and other types
+            // Bar, pie, donut, and other non-line types — SQL driven by groupBy
             if (groupBy === "month") {
               let sql = `SELECT strftime('%m', createdAt) as month, strftime('%m', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
@@ -191,21 +168,42 @@ export async function startServer(): Promise<void> {
               sql += ` GROUP BY month ORDER BY month`;
               const [rows] = await sequelize.query(sql);
               finalDataPayload = rows as any[];
-            } else if (groupBy === "productGroup" || groupBy === "category") {
-              // Product group / category bar chart
+            } else if (groupBy === "productGroup") {
               try {
                 const [rows] = await sequelize.query(
-                  `SELECT pg.name as label, pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT 10`,
+                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               } catch {
                 const [rows] = await sequelize.query(
-                  `SELECT p.name as label, p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT 10`,
+                  `SELECT p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               }
+            } else if (groupBy === "category") {
+              try {
+                const [rows] = await sequelize.query(
+                  `SELECT pc.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId JOIN ProductCategories pc ON pgc.categoryId = pc.id GROUP BY pc.name ORDER BY value DESC LIMIT ${limit}`,
+                );
+                finalDataPayload = rows as any[];
+              } catch {
+                const [rows] = await sequelize.query(
+                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
+                );
+                finalDataPayload = rows as any[];
+              }
+            } else if (groupBy === "product") {
+              const [rows] = await sequelize.query(
+                `SELECT p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
+              );
+              finalDataPayload = rows as any[];
+            } else if (groupBy === "status") {
+              const [rows] = await sequelize.query(
+                `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC LIMIT ${limit}`,
+              );
+              finalDataPayload = rows as any[];
             } else {
-              // Default bar: revenue by province
+              // Default: revenue by province
               let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
               const replacements: any = {};
 
@@ -214,7 +212,7 @@ export async function startServer(): Promise<void> {
                 replacements.targetYear = targetYear;
               }
 
-              sql += ` GROUP BY a.province ORDER BY value DESC LIMIT 10`;
+              sql += ` GROUP BY a.province ORDER BY value DESC LIMIT ${limit}`;
 
               const [rows] = await sequelize.query(sql, { replacements });
               finalDataPayload = rows as any[];
