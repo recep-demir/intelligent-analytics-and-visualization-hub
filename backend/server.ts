@@ -147,7 +147,8 @@ export async function startServer(): Promise<void> {
           (!groupBy || groupBy === "none") &&
           dynamicChartType === "bar" &&
           !targetYear &&
-          !yearRangeStart
+          !yearRangeStart &&
+          filters.length === 0
         ) {
           console.log(`❓ Unrecognized query: "${question}"`);
           return res.status(200).json({
