@@ -140,6 +140,30 @@ export async function startServer(): Promise<void> {
           }
         }
 
+        // --- Step 3: Reject unrecognized queries ---
+        // If the AI matched nothing (all defaults, no groupBy, no year), the query is out of context
+        // Gemini returns groupBy "none" for nonsensical queries; LocalEngine returns undefined
+        if (
+          (!groupBy || groupBy === "none") &&
+          dynamicChartType === "bar" &&
+          !targetYear &&
+          !yearRangeStart
+        ) {
+          console.log(`❓ Unrecognized query: "${question}"`);
+          return res.status(200).json({
+            chartConfig: {
+              chartType: "bar",
+              filters: [],
+              groupBy: "province",
+              dataset: "Orders",
+            },
+            fromCache: false,
+            data: [],
+            message:
+              "I don't have information about that. Try asking about revenue, taxes, products, categories, or provinces.",
+          });
+        }
+
         let finalDataPayload: any[] = [];
 
         // SQLite CASE expression to convert month numbers to abbreviated names

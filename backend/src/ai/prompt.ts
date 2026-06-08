@@ -63,10 +63,13 @@ Key relationships:
 - operator must be one of: eq | gt | lt | contains
 - If the user mentions a year (e.g. 2022, 2023), add a filter: { "field": "year", "operator": "eq", "value": "2022" }
 - If the user mentions a province or location, add a filter with operator "eq".
-- If the question is ambiguous, default to chartType "bar" and groupBy "province".
+- If the question is ambiguous but clearly about data (revenue, orders, products, taxes, provinces), default to chartType "bar" and groupBy "province".
+- If the question is nonsensical, gibberish, or completely unrelated to tax/revenue/orders/products/analytics, set groupBy to "none".
 - Words like "split", "breakdown", "distribution", "share" → chartType "pie".
 - Words like "trend", "over time", "changed", "over the years", "monthly" → chartType "line".
 - Words like "monthly" or "by month" → chartType "line" AND groupBy "month".
+- Words like "over the years", "yearly", "by year", or "years" → chartType "line" AND groupBy "year".
+- When a year range is specified (e.g. "from 2022 to 2023", "2022 to 2024", "between 2020 and 2023") → chartType "line" AND groupBy "year".
 - Words like "category", "categories", or "product category" → groupBy "category".
 - Words like "product group" or "product groups" → groupBy "productGroup".
 - Words like "product" or "products" (without "group" or "category") → groupBy "product".
