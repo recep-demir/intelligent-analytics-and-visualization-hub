@@ -1,6 +1,10 @@
-import type { RequestHandler } from "express";
-import jwt = require("jsonwebtoken");
+import type { Request, RequestHandler } from "express";
+import jwt from "jsonwebtoken";
 import type { JWTPayload } from "./types";
+
+type RequestWithUser = Request & {
+  user?: JWTPayload;
+};
 
 const UNAUTHORIZED_RESPONSE = {
   error: "Unauthorized",
@@ -45,9 +49,15 @@ export const requireAdminJWT: RequestHandler = (req, res, next) => {
     return res.status(401).json(UNAUTHORIZED_RESPONSE);
   }
 
-  const [scheme, token] = authHeader.split(" ");
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
 
-  if (scheme !== "Bearer" || !token) {
+  if (!bearerMatch) {
+    return res.status(401).json(UNAUTHORIZED_RESPONSE);
+  }
+
+  const token = bearerMatch[1].trim();
+
+  if (!token) {
     return res.status(401).json(UNAUTHORIZED_RESPONSE);
   }
 
@@ -61,6 +71,8 @@ export const requireAdminJWT: RequestHandler = (req, res, next) => {
     if (decodedPayload.role !== "admin") {
       return res.status(403).json(FORBIDDEN_RESPONSE);
     }
+
+    (req as RequestWithUser).user = decodedPayload;
 
     return next();
   } catch {
