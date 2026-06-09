@@ -114,11 +114,6 @@ export async function startServer(): Promise<void> {
         const groupBy: string | undefined = chartConfig.groupBy;
         const limit: number = chartConfig.limit ?? 10;
         let filters: any[] = chartConfig.filters ?? [];
-        const aggregation = detectAggregation(question, chartConfig.aggregation);
-        const calculation = detectCalculation(
-          question,
-          chartConfig.calculation ?? chartConfig.aggregation,
-        );
 
         // Extract potential target year safely
         const allYearsInQuestion = question.match(/\b(20\d{2})\b/g) ?? [];
@@ -176,71 +171,12 @@ export async function startServer(): Promise<void> {
 
         // SQLite CASE expression to convert month numbers to abbreviated names
         const monthNameCase = `CASE strftime('%m', createdAt) WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar' WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun' WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep' WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec' END`;
-        const orderRevenueDenominatorSql = targetYear
-          ? `SELECT SUM(subtotal) FROM Orders WHERE strftime('%Y', createdAt) = '${targetYear}'`
-          : yearRangeStart && yearRangeEnd
-            ? `SELECT SUM(subtotal) FROM Orders WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`
-            : "SELECT SUM(subtotal) FROM Orders";
-
-        const orderItemRevenueDenominatorSql =
-          "SELECT SUM(price * quantity) FROM OrderItems";
-
-        const orderSubtotalAggregate =
-          calculation === "percentage"
-            ? buildPercentageExpression("SUM(subtotal)", orderRevenueDenominatorSql)
-            : calculation === "ratio"
-              ? buildRatioExpression("SUM(subtotal)", "COUNT(id)")
-              : buildAggregateExpression(aggregation, "subtotal");
-
-        const orderAliasSubtotalAggregate =
-          calculation === "percentage"
-            ? buildPercentageExpression(
-                "SUM(o.subtotal)",
-                orderRevenueDenominatorSql,
-              )
-            : calculation === "ratio"
-              ? buildRatioExpression("SUM(o.subtotal)", "COUNT(o.id)")
-              : buildAggregateExpression(aggregation, "o.subtotal", "o.id");
-
-        const orderItemAggregate =
-          calculation === "percentage"
-            ? buildPercentageExpression(
-                "SUM(oi.price * oi.quantity)",
-                orderItemRevenueDenominatorSql,
-              )
-            : calculation === "ratio"
-              ? buildRatioExpression(
-                  "SUM(oi.price * oi.quantity)",
-                  "SUM(oi.quantity)",
-                )
-              : buildAggregateExpression(
-                  aggregation,
-                  "oi.price * oi.quantity",
-                  "oi.id",
-                );
-
-        const statusAggregate =
-          calculation === "percentage"
-            ? buildPercentageExpression("COUNT(*)", "SELECT COUNT(*) FROM Orders")
-            : calculation === "ratio"
-              ? buildRatioExpression("COUNT(*)", "SELECT COUNT(*) FROM Orders")
-              : buildAggregateExpression(aggregation, "subtotal");
-
-        const yoyCurrentYearSql = targetYear
-          ? `'${targetYear}'`
-          : "(SELECT MAX(strftime('%Y', createdAt)) FROM Orders)";
-        const yoyPreviousYearSql = targetYear
-          ? `'${Number(targetYear) - 1}'`
-          : "(SELECT CAST(CAST(MAX(strftime('%Y', createdAt)) AS INTEGER) - 1 AS TEXT) FROM Orders)";
-        const yoyCurrentRevenueExpression = `SUM(CASE WHEN strftime('%Y', o.createdAt) = ${yoyCurrentYearSql} THEN o.subtotal ELSE 0 END)`;
-        const yoyPreviousRevenueExpression = `SUM(CASE WHEN strftime('%Y', o.createdAt) = ${yoyPreviousYearSql} THEN o.subtotal ELSE 0 END)`;
-        const yoyGrowthExpression = `ROUND(((${yoyCurrentRevenueExpression}) - (${yoyPreviousRevenueExpression})) * 100.0 / NULLIF((${yoyPreviousRevenueExpression}), 0), 2)`;
 
         // --- Step 4: Build and execute SQL driven by AI-determined chartType + groupBy ---
         try {
           if (dynamicChartType === "line") {
             if (groupBy === "month") {
-              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ${orderSubtotalAggregate} as value FROM Orders`;
+              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
                 sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
               }
@@ -249,7 +185,7 @@ export async function startServer(): Promise<void> {
               finalDataPayload = rows as any[];
             } else {
               // Default line: group by year
-              let sql = `SELECT strftime('%Y', createdAt) as year, strftime('%Y', createdAt) as name, ${orderSubtotalAggregate} as value FROM Orders`;
+              let sql = `SELECT strftime('%Y', createdAt) as year, strftime('%Y', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (yearRangeStart && yearRangeEnd) {
                 sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
               } else if (targetYear) {
@@ -262,7 +198,7 @@ export async function startServer(): Promise<void> {
           } else {
             // Bar, pie, donut, and other non-line types — SQL driven by groupBy
             if (groupBy === "month") {
-              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ${orderSubtotalAggregate} as value FROM Orders`;
+              let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
                 sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
               }
@@ -272,41 +208,41 @@ export async function startServer(): Promise<void> {
             } else if (groupBy === "productGroup") {
               try {
                 const [rows] = await sequelize.query(
-                  `SELECT pg.name as name, ${orderItemAggregate} as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
+                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               } catch {
                 const [rows] = await sequelize.query(
-                  `SELECT p.name as name, ${orderItemAggregate} as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
+                  `SELECT p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               }
             } else if (groupBy === "category") {
               try {
                 const [rows] = await sequelize.query(
-                  `SELECT pc.name as name, ${orderItemAggregate} as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId JOIN ProductCategories pc ON pgc.categoryId = pc.id GROUP BY pc.name ORDER BY value DESC LIMIT ${limit}`,
+                  `SELECT pc.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId JOIN ProductCategories pc ON pgc.categoryId = pc.id GROUP BY pc.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               } catch {
                 const [rows] = await sequelize.query(
-                  `SELECT pg.name as name, ${orderItemAggregate} as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
+                  `SELECT pg.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id JOIN ProductGroups pg ON p.groupId = pg.id GROUP BY pg.name ORDER BY value DESC LIMIT ${limit}`,
                 );
                 finalDataPayload = rows as any[];
               }
             } else if (groupBy === "product") {
               const [rows] = await sequelize.query(
-                `SELECT p.name as name, ${orderItemAggregate} as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
+                `SELECT p.name as name, ROUND(SUM(oi.price * oi.quantity), 2) as value FROM OrderItems oi JOIN Products p ON oi.productId = p.id GROUP BY p.name ORDER BY value DESC LIMIT ${limit}`,
               );
               finalDataPayload = rows as any[];
             } else if (groupBy === "status") {
               const [rows] = await sequelize.query(
-                `SELECT status, status as name, ${statusAggregate} as value FROM Orders GROUP BY status ORDER BY value DESC LIMIT ${limit}`,
+                `SELECT status, status as name, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM Orders), 1) as value FROM Orders GROUP BY status ORDER BY value DESC LIMIT ${limit}`,
               );
               finalDataPayload = rows as any[];
             } else if (groupBy === "total") {
               // Single aggregate — no grouping
               const labelName = targetYear ?? "Total Revenue";
-              let sql = `SELECT '${labelName}' as name, '${labelName}' as year, ${orderSubtotalAggregate} as value FROM Orders`;
+              let sql = `SELECT '${labelName}' as name, '${labelName}' as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
                 sql += ` WHERE strftime('%Y', createdAt) = '${targetYear}'`;
               }
@@ -316,10 +252,7 @@ export async function startServer(): Promise<void> {
               dynamicChartType = "line";
             } else {
               // Default: revenue by province
-              let sql =
-                calculation === "yearOverYearGrowth"
-                  ? `SELECT a.province, a.province as name, ROUND(${yoyCurrentRevenueExpression}, 2) as currentValue, ROUND(${yoyPreviousRevenueExpression}, 2) as previousValue, ${yoyGrowthExpression} as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`
-                  : `SELECT a.province, a.province as name, ${orderAliasSubtotalAggregate} as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
+              let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
               const replacements: any = {};
 
               if (targetYear) {
@@ -366,8 +299,6 @@ export async function startServer(): Promise<void> {
             chartType: dynamicChartType,
             filters: filters,
             groupBy: computedGroupBy,
-            aggregation,
-            calculation,
             dataset: hybridDataset, // Passes Jest array evaluations and outputs a safe string to the client JSON
           },
           fromCache: isFromCache || (aiResult?.fromCache ?? false),
