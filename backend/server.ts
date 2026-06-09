@@ -11,6 +11,8 @@ import { print } from "graphql";
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
+import { buildAggregateExpression, buildPercentageExpression, buildRatioExpression, detectAggregation, detectCalculation } from "./src/analytics/aggregation";
+import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
 
 export async function createApolloServer() {
   await sequelize.authenticate();
@@ -29,8 +31,8 @@ export async function createApolloServer() {
   });
 
   const server = new ApolloServer({
-    typeDefs,
-    resolvers,
+    typeDefs: [typeDefs, dashboardTypeDefs],
+    resolvers: [resolvers, dashboardResolvers],
   });
 
   return { server, typeDefs };
