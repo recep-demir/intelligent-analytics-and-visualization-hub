@@ -40,6 +40,8 @@ jobs:
   qa-tests:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/development' || github.base_ref == 'development'
+    env:
+      JWT_SECRET: test-secret
 
     steps:
     - name: Checkout code
@@ -55,12 +57,17 @@ jobs:
         cd backend
         npm install
 
+    - name: Run backend unit tests
+      run: |
+        cd backend
+        npm run test
+
     - name: Start backend server
       run: |
         cd backend
         npm run dev &
         echo "Waiting for backend to be ready..."
-        npx wait-on tcp:4000 --timeout 30000
+        npx --yes wait-on tcp:4000 --timeout 30000
 
     - name: Install QA dependencies
       run: |
