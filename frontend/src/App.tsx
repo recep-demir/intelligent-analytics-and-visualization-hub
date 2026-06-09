@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Routes, Route } from "react-router-dom";
+import { DashboardLayout } from "./components/DashboardLayout";
+import { Dashboard } from "./components/Dashboard";
 import "./index.css";
+
+const NAV_ITEMS = [
+  { id: "assistant", label: "AI Assistant", path: "/" },
+  { id: "dashboard", label: "Dashboard",    path: "/dashboard" },
+];
 
 // Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
@@ -108,7 +116,7 @@ export default function App() {
     }
   };
 
-  return (
+  const nlAssistantPage = (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
       <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700">
         <label className="mr-2 text-sm text-gray-400">Current Role:</label>
@@ -503,5 +511,14 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+
+  return (
+    <DashboardLayout navItems={NAV_ITEMS}>
+      <Routes>
+        <Route path="/"          element={nlAssistantPage} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </DashboardLayout>
   );
 }
