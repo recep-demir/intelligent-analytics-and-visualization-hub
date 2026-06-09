@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
+    "noEmit": true,
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "strict": true,

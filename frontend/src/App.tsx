@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Routes, Route } from "react-router-dom";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
+import { DashboardLayout } from "./components/DashboardLayout";
+import { Dashboard } from "./components/Dashboard";
 import "./index.css";
 
 const CANADA_GEO = "/canada-provinces.json";
+
+const NAV_ITEMS = [
+  { id: "assistant", label: "AI Assistant", path: "/" },
+  { id: "dashboard", label: "Dashboard",    path: "/dashboard" },
+];
 
 const PROVINCE_CAPITALS: { city: string; anchor: "middle" | "start" | "end"; dx: number; dy: number; coords: [number, number] }[] = [
   { city: "Victoria",      coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
@@ -24,6 +32,7 @@ function normalizeProvince(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+// Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
   chartType: "line" | "bar" | "treemap" | "pie" | "donut" | "grid" | "heatmap" | "map" | "stat";
   dataset: string;
@@ -191,6 +200,7 @@ export default function App() {
     }
   };
 
+<<<<<<< HEAD
   // ── Renderers ───────────────────────────────────────────────────────────────
 
   const agg = chartData?.chartConfig.aggregation;
@@ -787,7 +797,7 @@ export default function App() {
 
   // ── Layout ───────────────────────────────────────────────────────────────────
 
-  return (
+  const nlAssistantPage = (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
       <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700">
         <label className="mr-2 text-sm text-gray-400">Current Role:</label>
@@ -862,5 +872,14 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+
+  return (
+    <DashboardLayout navItems={NAV_ITEMS}>
+      <Routes>
+        <Route path="/"          element={nlAssistantPage} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </DashboardLayout>
   );
 }

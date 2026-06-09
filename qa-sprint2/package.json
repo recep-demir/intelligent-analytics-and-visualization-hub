@@ -12,13 +12,21 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.test.{js,ts}"],
+    "testMatch": [
+      "**/tests/**/*.test.{js,ts}"
+    ],
     "testTimeout": 10000,
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ]
     }
   },
   "dependencies": {
+    "jsonwebtoken": "^9.0.3",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
   },

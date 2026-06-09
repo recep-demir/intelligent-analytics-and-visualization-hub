@@ -7,11 +7,14 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
+import { requireAdminJWT } from "./src/auth/rbacMiddleware";
 
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
+import { LocalEngine } from "./src/ai/engines/local";
 import { normalize } from "./src/ai/normalizer";
 import { build } from "./src/sql/queryBuilder";
+import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
 
 export async function createApolloServer() {
   await sequelize.authenticate();
@@ -29,7 +32,11 @@ export async function createApolloServer() {
     types: { Product },
   });
 
-  const server = new ApolloServer({ typeDefs, resolvers });
+  const server = new ApolloServer({
+    typeDefs: [typeDefs, dashboardTypeDefs],
+    resolvers: [resolvers, dashboardResolvers],
+  });
+
   return { server, typeDefs };
 }
 
@@ -50,7 +57,7 @@ export async function startServer(): Promise<void> {
     app.use(cors());
     app.use(express.json());
 
-    app.post("/api/ai/query", async (req, res) => {
+    app.post("/api/ai/query", requireAdminJWT, async (req, res) => {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
@@ -71,7 +78,6 @@ export async function startServer(): Promise<void> {
               ),
             ])
           : await (async () => {
-              const { LocalEngine } = await import("./src/ai/engines/local");
               const config = await new LocalEngine().resolve(question, schemaSdl);
               return { chartConfig: config, fromCache: false };
             })();

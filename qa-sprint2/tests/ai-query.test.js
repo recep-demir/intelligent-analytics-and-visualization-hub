@@ -46,12 +46,24 @@
  * NOTE: beforeAll() needs /auth/login to work first (Recep's job).
  */
 
+const jwt = require("jsonwebtoken");
 const { getToken, aiQuery } = require("../helpers/api");
 
+function createTestToken(role) {
+  return jwt.sign(
+    {
+      userId: role === "admin" ? 1 : 2,
+      email: `${role}.user@company.com`,
+      role,
+    },
+    process.env.JWT_SECRET || "test-secret",
+    { expiresIn: "1h" },
+  );
+}
+
 describe("AI Query", () => {
-  // Auth not yet implemented — tokens set to null, backend ignores Authorization header
-  let adminToken = null;
-  let analystToken = null;
+  let adminToken = createTestToken("admin");
+  let analystToken = createTestToken("analyst");
 
 // -------------------------------------------------------------------
 // JSON CONTRACT — every response must have these fields
