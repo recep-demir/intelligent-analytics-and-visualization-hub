@@ -1,5 +1,5 @@
 import { AIEngine } from "../../../../shared/types/ai";
-import { ChartConfig, ChartType } from "../../../../shared/types/chart";
+import { ChartConfig, ChartType, GroupByValue } from "../../../../shared/types/chart";
 
 // Rule-based fallback engine — no external API, no cost, works offline
 // Handles predictable patterns only. Use GeminiEngine for complex queries.
@@ -18,27 +18,48 @@ export class LocalEngine implements AIEngine {
   }
 
   private detectChartType(q: string): ChartType {
-    if (q.includes("map")) return "map";
+    // Explicit chart type keywords take priority over semantic ones
+    if (q.includes("heatmap"))                             return "heatmap";
+    if (q.includes("bar chart") || q.includes("bar graph")) return "bar";
+    if (q.includes("line chart") || q.includes("line graph")) return "line";
+    if (q.includes("pie chart"))                           return "pie";
+    if (q.includes("donut chart") || q.includes("donut")) return "donut";
+    if (q.includes("treemap") || q.includes("tree chart")) return "treemap";
+    if (q.includes("table") || q.includes("list"))         return "grid";
+    if (q.includes("map"))                                 return "map";
+
+    // Stat: single aggregate KPI — no groupBy dimension in the question
+    const hasDimension =
+      / by (province|year|month|status|category|product)/i.test(q) ||
+      /\b(monthly|yearly|annually|each year|each month|by year|by month)\b/.test(q);
+    if (!hasDimension && (
+      /\b(what is|how much|overall)\b/.test(q) ||
+      /\btotal (revenue|tax|orders?|sales|amount)\b/.test(q) ||
+      /\b(average|avg) (order|revenue|tax)\b/.test(q)
+    )) return "stat";
+
+    // Semantic fallbacks
     if (
       q.includes("pie") ||
       q.includes("split") ||
       q.includes("breakdown") ||
       q.includes("distribution")
-    )
-      return "pie";
-    if (q.includes("donut")) return "donut";
-    if (q.includes("heatmap")) return "heatmap";
+    ) return "pie";
     if (
-      q.includes("line") ||
-      q.includes("trend") ||
-      q.includes("over time") ||
+      q.includes("line")           ||
+      q.includes("trend")          ||
+      q.includes("over time")      ||
       q.includes("over the years") ||
-      q.includes("changed") ||
-      q.includes("monthly")
-    )
-      return "line";
-    if (q.includes("table") || q.includes("list")) return "grid";
-    return "bar";
+      q.includes("changed")        ||
+      q.includes("monthly")        ||
+      q.includes("by year")        ||
+      q.includes("by month")       ||
+      q.includes("yearly")         ||
+      q.includes("each month")     ||
+      q.includes("each year")
+    ) return "line";
+
+    return "treemap";
   }
 
   private detectDataset(q: string): string {
@@ -46,28 +67,27 @@ export class LocalEngine implements AIEngine {
     return "tax_records";
   }
 
-  private detectGroupBy(q: string): string | undefined {
+  private detectGroupBy(q: string): GroupByValue | undefined {
     if (q.includes("product group")) return "productGroup";
-    if (q.includes("province")) return "province";
-    if (q.includes("city")) return "city";
-    if (q.includes("country")) return "country";
-    if (q.includes("year")) return "year";
-    if (q.includes("month")) return "month";
-    if (q.includes("categor")) return "category";
-    if (q.includes("product")) return "product";
-    if (q.includes("status")) return "status";
-    if (/\btotal\b/.test(q) || /\bsum\b/.test(q)) return "total";
+    if (q.includes("province"))      return "province";
+    if (q.includes("year"))          return "year";
+    if (q.includes("month"))         return "month";
+    if (q.includes("categor"))       return "category";
+    if (q.includes("product"))       return "product";
+    if (q.includes("status"))        return "status";
     return undefined;
   }
 
   private detectFilters(q: string): ChartConfig["filters"] {
     const filters: ChartConfig["filters"] = [];
 
-    // Country filter
-    if (q.includes("canada") || q.includes(" ca "))
-      filters.push({ field: "country", operator: "eq", value: "CA" });
-    else if (q.includes("united states") || q.includes(" us "))
-      filters.push({ field: "country", operator: "eq", value: "US" });
+    // Default to Canada — this is a Canadian tax analytics platform.
+    // DB stores country codes lowercase ("ca", "us").
+    // Only override when user explicitly asks for another country.
+    if (q.includes("united states") || q.includes(" us ") || q.includes("mexico"))
+      filters.push({ field: "country", operator: "eq", value: "us" });
+    else
+      filters.push({ field: "country", operator: "eq", value: "ca" });
 
     // Province filter
     const provinces = [
@@ -96,20 +116,26 @@ export class LocalEngine implements AIEngine {
       }
     }
 
-    // Year filter — match 4-digit year
-    const yearMatch = q.match(/\b(20\d{2})\b/);
-    if (yearMatch)
-      filters.push({ field: "year", operator: "eq", value: yearMatch[1] });
+    // Year filter — single year or range ("from 2020 to 2022", "2020-2022")
+    const yearMatches = [...q.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]).sort();
+    if (yearMatches.length >= 2) {
+      filters.push({ field: "year", operator: "gte", value: yearMatches[0] });
+      filters.push({ field: "year", operator: "lte", value: yearMatches[yearMatches.length - 1] });
+    } else if (yearMatches.length === 1) {
+      filters.push({ field: "year", operator: "eq", value: yearMatches[0] });
+    }
 
     return filters;
   }
 
   private detectLimit(q: string): number | undefined {
-    // Matches patterns like "top 5", "bottom 10", "5 best", "3 worst",
-    // "largest 7", "smallest 4"
+    // Superlative — "highest/lowest/best/worst province" means top 1
+    if (/\b(highest|most|largest|biggest|best)\b/.test(q))  return 1;
+    if (/\b(lowest|least|smallest|fewest|worst)\b/.test(q)) return 1;
+
+    // Numbered — "top 5", "bottom 10", "5 best", "3 worst"
     const prefixPattern = /\b(?:top|bottom|largest|smallest)\s+(\d+)\b/;
-    const suffixPattern =
-      /\b(\d+)\s+(?:best|worst|top|bottom|largest|smallest)\b/;
+    const suffixPattern = /\b(\d+)\s+(?:best|worst|top|bottom|largest|smallest)\b/;
 
     const prefixMatch = q.match(prefixPattern);
     if (prefixMatch) return parseInt(prefixMatch[1], 10);
