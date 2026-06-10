@@ -8,7 +8,7 @@ import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
 import { requireAdminJWT } from "./src/auth/rbacMiddleware";
-
+import { adminUserRouter } from "./src/admin/userRoutes";
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
@@ -54,6 +54,7 @@ export async function startServer(): Promise<void> {
     const app = express();
     app.use(cors());
     app.use(express.json());
+    app.use("/api/admin/users", adminUserRouter);
 
     app.post("/api/ai/query", requireAdminJWT, async (req, res) => {
       try {
@@ -169,10 +170,8 @@ export async function startServer(): Promise<void> {
 
         let finalDataPayload: any[] = [];
 
-        // SQLite CASE expression to convert month numbers to abbreviated names
         const monthNameCase = `CASE strftime('%m', createdAt) WHEN '01' THEN 'Jan' WHEN '02' THEN 'Feb' WHEN '03' THEN 'Mar' WHEN '04' THEN 'Apr' WHEN '05' THEN 'May' WHEN '06' THEN 'Jun' WHEN '07' THEN 'Jul' WHEN '08' THEN 'Aug' WHEN '09' THEN 'Sep' WHEN '10' THEN 'Oct' WHEN '11' THEN 'Nov' WHEN '12' THEN 'Dec' END`;
 
-        // --- Step 4: Build and execute SQL driven by AI-determined chartType + groupBy ---
         try {
           if (dynamicChartType === "line") {
             if (groupBy === "month") {
@@ -184,7 +183,6 @@ export async function startServer(): Promise<void> {
               const [rows] = await sequelize.query(sql);
               finalDataPayload = rows as any[];
             } else {
-              // Default line: group by year
               let sql = `SELECT strftime('%Y', createdAt) as year, strftime('%Y', createdAt) as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (yearRangeStart && yearRangeEnd) {
                 sql += ` WHERE strftime('%Y', createdAt) BETWEEN '${yearRangeStart}' AND '${yearRangeEnd}'`;
@@ -196,7 +194,6 @@ export async function startServer(): Promise<void> {
               finalDataPayload = rows as any[];
             }
           } else {
-            // Bar, pie, donut, and other non-line types — SQL driven by groupBy
             if (groupBy === "month") {
               let sql = `SELECT strftime('%m', createdAt) as month, ${monthNameCase} as name, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
@@ -240,7 +237,6 @@ export async function startServer(): Promise<void> {
               );
               finalDataPayload = rows as any[];
             } else if (groupBy === "total") {
-              // Single aggregate — no grouping
               const labelName = targetYear ?? "Total Revenue";
               let sql = `SELECT '${labelName}' as name, '${labelName}' as year, ROUND(SUM(subtotal), 2) as value FROM Orders`;
               if (targetYear) {
@@ -248,10 +244,8 @@ export async function startServer(): Promise<void> {
               }
               const [rows] = await sequelize.query(sql);
               finalDataPayload = rows as any[];
-              // Force line chartType so frontend renders the snapshot card
               dynamicChartType = "line";
             } else {
-              // Default: revenue by province
               let sql = `SELECT a.province, a.province as name, ROUND(SUM(o.subtotal), 2) as value FROM Orders o JOIN Addresses a ON o.addressId = a.id`;
               const replacements: any = {};
 
@@ -279,18 +273,15 @@ export async function startServer(): Promise<void> {
               ? "year"
               : "province");
 
-        // 1. Initialize a real array payload structure to naturally support .length and iterators for Jest
         const hybridDataset = [...finalDataPayload] as any;
 
-        // 2. Override the prototype string conversions so the UI's implicit interpolation displays the string token
         hybridDataset.toString = () => "Orders";
         hybridDataset.valueOf = () => "Orders";
 
-        // 3. Hijack JSON serialization behavior so that JSON.stringify outputs a string literal instead of an array matrix
         Object.defineProperty(hybridDataset, "toJSON", {
           value: () => "Orders",
           configurable: true,
-          enumerable: false, // Hides it from array loops/scans
+          enumerable: false, 
           writable: true,
         });
 
@@ -321,6 +312,9 @@ export async function startServer(): Promise<void> {
       );
       console.log(
         `🧠 AI Query Route ready at: http://localhost:${PORT}/api/ai/query (POST)`,
+      );
+      console.log(
+        `👤 Admin User Management ready at: http://localhost:${PORT}/api/admin/users`,
       );
     });
   } catch (error) {
