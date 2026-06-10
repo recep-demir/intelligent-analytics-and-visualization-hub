@@ -4,6 +4,21 @@ import { DashboardLayout } from "./components/DashboardLayout";
 import { Dashboard } from "./components/Dashboard";
 import "./index.css";
 
+const mockUsers: Record<string, any> = { 
+  "admin.user@company.com": { 
+    password: "admin123", 
+    user: { userId: 1, email: "admin.user@company.com", role: "admin" } 
+  }, 
+  "analyst.user@company.com": { 
+    password: "analyst123", 
+    user: { userId: 2, email: "analyst.user@company.com", role: "analyst" } 
+  }, 
+  "viewer.user@company.com": { 
+    password: "viewer123", 
+    user: { userId: 3, email: "viewer.user@company.com", role: "viewer" } 
+  } 
+};
+
 const NAV_ITEMS = [
   { id: "assistant", label: "AI Assistant", path: "/" },
   { id: "dashboard", label: "Dashboard",    path: "/dashboard" },
@@ -63,43 +78,36 @@ export default function App() {
 
   // 🔐 STEP 2: Authentication Handler (POST /api/auth/login)
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
+  e.preventDefault();
+  setAuthError(null);
 
-    try {
-      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+  // Formdan girilen e-postayı mock listede ara
+  const foundUser = mockUsers[email];
 
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      // Acceptance Criteria: Validate HTTP 401 for wrong credentials
-      if (response.status === 401) {
-        setAuthError("Invalid username or password");
-        setPassword(""); // Acceptance Criteria: Clear the password field on failure
-        return;
-      }
-
-      if (!response.ok) throw new Error("Login failed");
-
-      const data = await response.json(); // Expected payload shape: LoginResponse { token, user }
-
-      // Securely store the token and evaluate the security profile group
-      localStorage.setItem("token", data.token);
-      setToken(data.token);
-      
-      const roleFromDecoded = getRoleFromToken(data.token);
-      setUserRole(roleFromDecoded);
-      
-      // Reset input form fields
-      setEmail("");
-      setPassword("");
-    } catch (err) {
-      setAuthError("An unexpected error occurred during login.");
-    }
-  };
+  if (foundUser && foundUser.password === password) {
+    // === BAŞARILI GİRİŞ SENARYOSU ===
+    
+    // Güvenli profile token ataması simülasyonu
+    localStorage.setItem("token", "mock-local-jwt-token");
+    setToken("mock-local-jwt-token");
+    
+    // getRoleFromToken fonksiyonunu bypass edip direkt mock rolden alıyoruz
+    setUserRole(foundUser.user.role);
+    
+    // Reset input form fields
+    setEmail("");
+    setPassword("");
+    console.log(`🔐 Başarıyla giriş yapıldı. Rol: ${foundUser.user.role}`);
+  } else {
+    // === BAŞARISIZ GİRİŞ SENARYOSU (HTTP 401 Simülasyonu) ===
+    
+    // Acceptance Criteria: Validate HTTP 401 for wrong credentials
+    setAuthError("Invalid username or password");
+    
+    // Acceptance Criteria: Clear the password field on failure
+    setPassword(""); 
+  }
+};
 
   // 🚪 STEP 3: Logout Handler (POST /api/auth/logout)
   const handleLogout = async () => {
