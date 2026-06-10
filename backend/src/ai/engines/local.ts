@@ -112,15 +112,22 @@ export class LocalEngine implements AIEngine {
           operator: "eq",
           value: this.toTitleCase(p),
         });
-        break;
+        // no break — collect all mentioned provinces
       }
     }
 
-    // Year filter — single year or range ("from 2020 to 2022", "2020-2022")
-    const yearMatches = [...q.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]).sort();
+    // Year filter — single year, explicit range, or discrete years ("for 2022 and 2024")
+    const yearMatches = [...new Set([...q.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]))].sort();
     if (yearMatches.length >= 2) {
-      filters.push({ field: "year", operator: "gte", value: yearMatches[0] });
-      filters.push({ field: "year", operator: "lte", value: yearMatches[yearMatches.length - 1] });
+      const isRange = /\bfrom\s+20\d{2}\s+to\b|\b20\d{2}\s*[-–]\s*20\d{2}\b|\bbetween\b/.test(q);
+      if (isRange) {
+        filters.push({ field: "year", operator: "gte", value: yearMatches[0] });
+        filters.push({ field: "year", operator: "lte", value: yearMatches[yearMatches.length - 1] });
+      } else {
+        for (const y of yearMatches) {
+          filters.push({ field: "year", operator: "eq", value: y });
+        }
+      }
     } else if (yearMatches.length === 1) {
       filters.push({ field: "year", operator: "eq", value: yearMatches[0] });
     }
@@ -129,13 +136,21 @@ export class LocalEngine implements AIEngine {
   }
 
   private detectLimit(q: string): number | undefined {
-    // Superlative — "highest/lowest/best/worst province" means top 1
-    if (/\b(highest|most|largest|biggest|best)\b/.test(q))  return 1;
-    if (/\b(lowest|least|smallest|fewest|worst)\b/.test(q)) return 1;
+    // Numbered superlative — "lowest 3", "highest 5", "best 10" — number wins over bare superlative
+    const supNumPattern = /\b(?:lowest|least|smallest|fewest|worst|highest|most|largest|biggest|best)\s+(\d+)\b/;
+    const numSupPattern = /\b(\d+)\s+(?:lowest|least|smallest|fewest|worst|highest|most|largest|biggest|best)\b/;
+    const supNumMatch = q.match(supNumPattern);
+    if (supNumMatch) return parseInt(supNumMatch[1], 10);
+    const numSupMatch = q.match(numSupPattern);
+    if (numSupMatch) return parseInt(numSupMatch[1], 10);
 
     // Numbered — "top 5", "bottom 10", "5 best", "3 worst"
     const prefixPattern = /\b(?:top|bottom|largest|smallest)\s+(\d+)\b/;
     const suffixPattern = /\b(\d+)\s+(?:best|worst|top|bottom|largest|smallest)\b/;
+
+    // Bare superlative — "the highest province" → limit 1
+    if (/\b(highest|most|largest|biggest|best)\b/.test(q))  return 1;
+    if (/\b(lowest|least|smallest|fewest|worst)\b/.test(q)) return 1;
 
     const prefixMatch = q.match(prefixPattern);
     if (prefixMatch) return parseInt(prefixMatch[1], 10);

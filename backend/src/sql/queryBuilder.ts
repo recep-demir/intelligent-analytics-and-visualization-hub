@@ -36,23 +36,49 @@ function buildWhereClause(filters: Filter[]): { where: string; replacements: Rec
   const conditions: string[] = []
   const replacements: Record<string, unknown> = {}
 
-  filters.forEach((f, i) => {
+  // Group eq filters by field — multiple values on the same field become IN (…)
+  // instead of field = A AND field = B which always returns empty.
+  const eqGroups: Record<string, string[]> = {}
+  const nonEq: Filter[] = []
+
+  filters.forEach(f => {
+    if (f.operator === 'eq') {
+      if (!eqGroups[f.field]) eqGroups[f.field] = []
+      eqGroups[f.field].push(f.value)
+    } else {
+      nonEq.push(f)
+    }
+  })
+
+  Object.entries(eqGroups).forEach(([field, values]) => {
+    const col = FIELD_SQL[field]
+    if (!col) return
+    if (values.length === 1) {
+      const key = `eq_${field}_0`
+      conditions.push(`${col} = :${key}`)
+      replacements[key] = values[0]
+    } else {
+      values.forEach((v, i) => { replacements[`eq_${field}_${i}`] = v })
+      const keys = values.map((_, i) => `:eq_${field}_${i}`).join(', ')
+      conditions.push(`${col} IN (${keys})`)
+    }
+  })
+
+  nonEq.forEach((f, i) => {
     const col = FIELD_SQL[f.field]
     if (!col) return
-
     const key = `f${i}`
     switch (f.operator) {
-      case 'eq':       conditions.push(`${col} = :${key}`);            replacements[key] = f.value; break
-      case 'gt':       conditions.push(`${col} > :${key}`);            replacements[key] = f.value; break
-      case 'lt':       conditions.push(`${col} < :${key}`);            replacements[key] = f.value; break
-      case 'gte':      conditions.push(`${col} >= :${key}`);           replacements[key] = f.value; break
-      case 'lte':      conditions.push(`${col} <= :${key}`);           replacements[key] = f.value; break
-      case 'contains': conditions.push(`${col} LIKE :${key}`);         replacements[key] = `%${f.value}%`; break
+      case 'gt':       conditions.push(`${col} > :${key}`);    replacements[key] = f.value; break
+      case 'lt':       conditions.push(`${col} < :${key}`);    replacements[key] = f.value; break
+      case 'gte':      conditions.push(`${col} >= :${key}`);   replacements[key] = f.value; break
+      case 'lte':      conditions.push(`${col} <= :${key}`);   replacements[key] = f.value; break
+      case 'contains': conditions.push(`${col} LIKE :${key}`); replacements[key] = `%${f.value}%`; break
     }
   })
 
   return {
-    where:        conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
     replacements,
   }
 }
@@ -65,6 +91,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
   const aggExpr = buildAggregateExpression(q.aggregation, 'o.subtotal')
   const { where, replacements } = buildWhereClause(q.filters)
   const limit = q.limit
+  const ord = q.sortAsc ? 'ASC' : 'DESC'
 
   switch (q.chartType) {
 
@@ -221,7 +248,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
               FROM Orders o
               LEFT JOIN Addresses a ON o.addressId = a.id
               ${where}
-              GROUP BY year ORDER BY value DESC LIMIT :limit
+              GROUP BY year ORDER BY value ${ord} LIMIT :limit
             `.trim(),
             replacements: { ...replacements, limit },
           }
@@ -233,7 +260,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
               FROM Orders o
               LEFT JOIN Addresses a ON o.addressId = a.id
               ${where}
-              GROUP BY o.status ORDER BY value DESC
+              GROUP BY o.status ORDER BY value ${ord}
             `.trim(),
             replacements,
           }
@@ -249,7 +276,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
               JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId
               JOIN ProductCategories pc ON pgc.categoryId = pc.id
               ${where}
-              GROUP BY pc.name ORDER BY value DESC LIMIT :limit
+              GROUP BY pc.name ORDER BY value ${ord} LIMIT :limit
             `.trim(),
             replacements: { ...replacements, limit },
           }
@@ -264,7 +291,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
               JOIN Products p ON oi.productId = p.id
               JOIN ProductGroups pg ON p.groupId = pg.id
               ${where}
-              GROUP BY pg.name ORDER BY value DESC LIMIT :limit
+              GROUP BY pg.name ORDER BY value ${ord} LIMIT :limit
             `.trim(),
             replacements: { ...replacements, limit },
           }
@@ -278,7 +305,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
               LEFT JOIN Addresses a ON o.addressId = a.id
               JOIN Products p ON oi.productId = p.id
               ${where}
-              GROUP BY p.name ORDER BY value DESC LIMIT :limit
+              GROUP BY p.name ORDER BY value ${ord} LIMIT :limit
             `.trim(),
             replacements: { ...replacements, limit },
           }
@@ -293,7 +320,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
                   FROM Orders o
                   JOIN Addresses a ON o.addressId = a.id
                   ${where}
-                  GROUP BY a.province ORDER BY value DESC LIMIT :limit
+                  GROUP BY a.province ORDER BY value ${ord} LIMIT :limit
                 `.trim(),
                 replacements: { ...replacements, limit },
               }
@@ -303,7 +330,7 @@ export function build(q: ResolvedQuery): BuiltQuery {
                   FROM Orders o
                   JOIN Addresses a ON o.addressId = a.id
                   ${where}
-                  GROUP BY a.province ORDER BY value DESC
+                  GROUP BY a.province ORDER BY value ${ord}
                 `.trim(),
                 replacements,
               }

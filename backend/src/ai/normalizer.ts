@@ -7,13 +7,14 @@ import { Aggregation, detectAggregation } from '../analytics/aggregation'
 // which makes normalization structurally mandatory.
 // ---------------------------------------------------------------------------
 export interface ResolvedQuery {
-  chartType:      ChartType
-  groupBy:        GroupByValue | undefined
-  groupBy2?:      GroupByValue              // heatmap second dimension only
-  filters:        Filter[]
-  aggregation:    Aggregation
-  limit:          number
-  limitIsExplicit: boolean               // true = user asked for top/bottom N; map/treemap respect it only then
+  chartType:       ChartType
+  groupBy:         GroupByValue | undefined
+  groupBy2?:       GroupByValue              // heatmap second dimension only
+  filters:         Filter[]
+  aggregation:     Aggregation
+  limit:           number
+  limitIsExplicit: boolean                  // true = user asked for top/bottom N; map/treemap respect it only then
+  sortAsc:         boolean                  // true = ORDER BY ASC (lowest/worst queries)
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,9 @@ function coerce(chartType: ChartType, groupBy: GroupByValue | undefined): {
 function inferGroupBy2(question: string): GroupByValue {
   const q = question.toLowerCase()
   if (/\b(year|yearly|annual|by year)\b/.test(q)) return 'year'
+  // Two distinct years mentioned without a time-series keyword → columns should be years
+  const years = [...new Set([...q.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]))]
+  if (years.length >= 2) return 'year'
   return 'month'
 }
 
@@ -87,6 +91,7 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
     aggregation:     detectAggregation(question, config.aggregation),
     limit:           config.limit ?? 10,
     limitIsExplicit: config.limit !== undefined,
+    sortAsc:         /\b(lowest|least|smallest|fewest|worst)\b/i.test(question),
   }
 
   if (chartType === 'heatmap') {

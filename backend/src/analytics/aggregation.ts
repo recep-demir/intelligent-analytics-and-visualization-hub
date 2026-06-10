@@ -19,7 +19,7 @@ export function detectAggregation(
 
   const q = question.toLowerCase();
   if (/\b(avg|average|mean)\b/.test(q))        return "avg";
-  if (/\b(count|number of|how many)\b/.test(q)) return "count";
+  if (/\b(count|number of|how many|by orders?|orders? count)\b/.test(q)) return "count";
   // "min and max" / "minimum and maximum" / "max and min"
   if (
     /\b(min|minimum)\b.*\b(max|maximum)\b/.test(q) ||
