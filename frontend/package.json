@@ -15,10 +15,12 @@
     "autoprefixer": "^10.5.0",
     "chart.js": "^4.4.1",
     "postcss": "^8.5.15",
+    "prop-types": "^15.8.1",
     "react": "^19.2.6",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.17.0",
+    "react-simple-maps": "^3.0.0",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
