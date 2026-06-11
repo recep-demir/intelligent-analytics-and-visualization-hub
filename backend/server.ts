@@ -7,13 +7,14 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
-
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
 import { normalize } from "./src/ai/normalizer";
 import { build } from "./src/sql/queryBuilder";
 import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
+import { authRouter } from "./src/auth/authRoutes";
+import { adminUserRouter } from "./src/admin/userRoutes";
 
 export async function createApolloServer() {
   await sequelize.authenticate();
@@ -47,26 +48,32 @@ export async function startServer(): Promise<void> {
     const engine = process.env.GEMINI_API_KEY
       ? new GeminiEngine(process.env.GEMINI_API_KEY)
       : new LocalEngine();
+
     const adapter = new AIAdapter(engine);
     const engineName = process.env.GEMINI_API_KEY ? "Gemini" : "Local";
     console.log(`🧠 AI Engine: ${engineName}`);
 
     const app = express();
+
     app.use(cors());
     app.use(express.json());
+    app.use("/api/auth", authRouter);
+    app.use("/api/admin/users", adminUserRouter);
 
     app.post("/api/ai/query", async (req, res) => {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
         if (typeof rawQuestion !== "string" || rawQuestion.trim().length === 0) {
-          return res.status(400).json({ error: "Missing question in request body" });
+          return res.status(400).json({
+            error: "Missing question in request body",
+          });
         }
 
         const question = rawQuestion.trim();
         console.log(`🤖 Incoming AI Query: "${question}"`);
 
-        // Step 1 — AI resolution (adapter always wraps engine with cache + fallback)
+        // Step 1 — AI resolution
         const schemaSdl = print(typeDefs);
         const aiResult = await Promise.race([
           adapter.resolve({ nl: question }, schemaSdl),
@@ -79,24 +86,31 @@ export async function startServer(): Promise<void> {
           `✅ Resolved: chartType=${aiResult.chartConfig.chartType} groupBy=${aiResult.chartConfig.groupBy}`,
         );
 
-        // Step 2 — Normalize: ChartConfig → ResolvedQuery
+        // Step 2 — Normalize chart config into a resolved query
         const resolved = normalize(aiResult.chartConfig, question);
 
         // Step 3 — Reject unrecognized queries
         if (resolved.groupBy === "none") {
           return res.status(200).json({
-            chartConfig: { chartType: "bar", filters: [], groupBy: "province", dataset: "Orders" },
+            chartConfig: {
+              chartType: "bar",
+              filters: [],
+              groupBy: "province",
+              dataset: "Orders",
+            },
             fromCache: false,
             data: [],
-            message: "I don't have information about that. Try asking about revenue, taxes, products, categories, or provinces.",
+            message:
+              "I don't have information about that. Try asking about revenue, taxes, products, categories, or provinces.",
           });
         }
 
-        // Step 4 — Build SQL from ResolvedQuery
+        // Step 4 — Build SQL from the resolved query
         const { sql, replacements } = build(resolved);
 
-        // Step 5 — Execute
+        // Step 5 — Execute SQL
         let data: any[] = [];
+
         try {
           const [rows] = await sequelize.query(sql, { replacements });
           data = rows as any[];
@@ -106,10 +120,10 @@ export async function startServer(): Promise<void> {
 
         return res.status(200).json({
           chartConfig: {
-            chartType:   resolved.chartType,
-            groupBy:     resolved.groupBy,
-            filters:     resolved.filters,
-            dataset:     "Orders",
+            chartType: resolved.chartType,
+            groupBy: resolved.groupBy,
+            filters: resolved.filters,
+            dataset: "Orders",
             aggregation: resolved.aggregation,
           },
           fromCache: aiResult.fromCache,
@@ -117,16 +131,22 @@ export async function startServer(): Promise<void> {
         });
       } catch (error) {
         console.error("🔴 AI Error:", error);
-        return res.status(500).json({ error: "An error occurred while processing the AI request" });
+
+        return res.status(500).json({
+          error: "An error occurred while processing the AI request",
+        });
       }
     });
 
     app.use("/graphql", expressMiddleware(server));
 
     const PORT = 4000;
+
     app.listen(PORT, () => {
       console.log(`🚀 GraphQL Server ready at: http://localhost:${PORT}/graphql`);
       console.log(`🧠 AI Query Route ready at: http://localhost:${PORT}/api/ai/query (POST)`);
+      console.log(`🔐 Auth Login ready at: http://localhost:${PORT}/api/auth/login`);
+      console.log(`👤 Admin User Management ready at: http://localhost:${PORT}/api/admin/users`);
     });
   } catch (error) {
     console.error("🔴 Failed to start server:", error);
