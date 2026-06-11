@@ -1,3 +1,4 @@
+import { AdminPanel } from "./components/AdminPanel";
 import React, { useState, useEffect, useRef } from "react";
 import { Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "./components/DashboardLayout";
@@ -26,7 +27,9 @@ interface NLQueryResponse {
 
 export default function App() {
   const [query, setQuery] = useState("");
-  const [userRole, setUserRole] = useState("Admin");
+  
+  // 🧭 B-3 Fail-Safe: Set initial state strictly to lowercase "viewer" to match JWT contract rules
+  const [userRole, setUserRole] = useState("viewer");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<NLQueryResponse | null>(null);
@@ -55,19 +58,6 @@ export default function App() {
     setError(null);
     setChartData(null);
     setIsLoading(true);
-
-    const sensitiveKeywords = ["revenue", "salary", "profit", "commercial"];
-    const hasSensitiveWord = sensitiveKeywords.some((word) =>
-      query.toLowerCase().includes(word),
-    );
-
-    if (userRole === "Restricted" && hasSensitiveWord) {
-      setError(
-        "Access Denied: Your role is restricted from querying financial metrics. (UX Safeguard)",
-      );
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -118,40 +108,67 @@ export default function App() {
 
   const nlAssistantPage = (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
-      <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700">
-        <label className="mr-2 text-sm text-gray-400">Current Role:</label>
+      
+      {/* 🛠️ B-3 Refactored Current Role Block: Cleaned and strictly restricted to the 3 requested roles */}
+      <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700 flex items-center gap-3">
+        <label className="text-sm text-gray-400">Current Role:</label>
         <select
-          value={userRole}
-          onChange={(e) => setUserRole(e.target.value)}
+          value={userRole.toLowerCase()} // 🧭 Perfect visual synchronization for all options
+          onChange={(e) => setUserRole(e.target.value.toLowerCase())}
           className="bg-gray-700 text-white rounded px-2 py-1 text-sm outline-none cursor-pointer"
         >
-          <option value="Admin">Admin User</option>
-          <option value="Restricted">Restricted User</option>
+          {/* 🧭 Strictly matching Heba's B-1 & B-3 Official Token Contract Roles */}
+          <option value="viewer">Viewer User</option>
+          <option value="analyst">Analyst User</option>
+          <option value="admin">Admin User</option> 
         </select>
+
+        {/* 🧭 US-64 & B-3 Criteria: Cache-clear button is visible ONLY if userRole is exactly 'admin' */}
+        {userRole.toLowerCase() === "admin" && (
+          <button
+            onClick={() => {
+              localStorage.clear();
+              setChartData(null);
+              setError(null);
+              alert("Cache cleared successfully!");
+            }}
+            className="bg-red-600 hover:bg-red-500 text-white text-[11px] font-medium px-3 py-1 rounded transition-colors shadow-md w-full sm:w-auto"
+          >
+            Clear Cache
+          </button>
+        )}
       </div>
 
       <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col justify-center items-center">
         <h1 className="text-3xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
           Elio Tax AI Assistant
         </h1>
-
-        <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask me to visualize tax data trends..."
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !query.trim()}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-lg min-w-[140px]"
-          >
-            {isLoading ? "Analyzing..." : "Ask Assistant"}
-          </button>
-        </form>
+        
+        {/* 🧭 US-63 (B-3) AC: AI query input must be strictly hidden for the 'viewer' role */}
+        {userRole.toLowerCase() !== "viewer" ? (
+          <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ask me to visualize tax data trends..."
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !query.trim()}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-lg min-w-[140px]"
+            >
+              {isLoading ? "Analyzing..." : "Ask Assistant"}
+            </button>
+          </form>
+        ) : (
+          /* 🔒 B-3 Requirement Compliance: UX Safeguard for Viewers */
+          <div className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg p-4 text-center mb-8 text-sm text-gray-400">
+            🔒 Your current role (Viewer) has read-only access. AI query capabilities are restricted.
+          </div>
+        )}
 
         <div className="w-full min-h-[380px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
           {isLoading && (
@@ -206,7 +223,6 @@ export default function App() {
                           0,
                         ) || 1;
 
-                      // Build dynamic conic-gradient from real data
                       let cumulative = 0;
                       const stops = records
                         .map((r: any, i: number) => {
@@ -341,7 +357,6 @@ export default function App() {
                       const points = chartData.data ?? [];
                       if (points.length === 0) return null;
 
-                      // Single year — show snapshot card instead of line chart
                       if (points.length === 1) {
                         const val = points[0].value ?? points[0].amount ?? 0;
                         const year =
@@ -410,7 +425,6 @@ export default function App() {
                       return (
                         <>
                           <div className="flex gap-1 items-stretch">
-                            {/* Y axis labels */}
                             <div
                               className="flex flex-col justify-between text-right text-[9px] font-mono text-gray-500 pr-1 py-1"
                               style={{ width: "44px" }}
@@ -420,7 +434,6 @@ export default function App() {
                               <span>{formatVal(minValue)}</span>
                             </div>
 
-                            {/* Chart area */}
                             <div className="flex-1 relative h-36 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-visible backdrop-blur-sm">
                               <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed"></div>
                               <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed"></div>
@@ -485,7 +498,6 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* X axis — year labels */}
                           <div
                             className="flex justify-between text-[9px] font-mono text-gray-500 mt-1 pr-1"
                             style={{ paddingLeft: "52px" }}
@@ -513,11 +525,18 @@ export default function App() {
     </div>
   );
 
+  // 🧭 US-63 & B-3 Match: Add admin panel to navigation ONLY if role is exactly lowercase 'admin'
+  const dynamicNavItems = [...NAV_ITEMS];
+  if (userRole.toLowerCase() === "admin") {
+    dynamicNavItems.push({ id: "admin", label: "Admin Panel", path: "/admin" });
+  }
+
   return (
-    <DashboardLayout navItems={NAV_ITEMS}>
+    <DashboardLayout navItems={dynamicNavItems}>
       <Routes>
         <Route path="/"          element={nlAssistantPage} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin"     element={<AdminPanel />} /> 
       </Routes>
     </DashboardLayout>
   );
