@@ -1,17 +1,47 @@
 /**
  * US-13 — Analytics Prompt Template
  *
- * Centralised prompt definitions for the AI adapter.
- * All prompt changes go here — never scattered across engine files.
- *
  * Two-part design:
  *   SYSTEM_INSTRUCTION — fixed rules loaded once at engine startup
- *   buildUserPrompt()  — dynamic part, includes schema + user question
+ *   buildUserPrompt()  — dynamic: live GraphQL SDL + data sample + question
  */
 
 // ---------------------------------------------------------------------------
-// System instruction — loaded once when GeminiEngine is initialised.
-// Tells the model its role, output rules, and what it must never do.
+// DATA_SAMPLE — injected into every user prompt so the AI understands real
+// field shapes and value ranges. Update when schema or seed data changes.
+// ---------------------------------------------------------------------------
+export const DATA_SAMPLE = `
+Live data sample (use these to understand real field shapes and value ranges):
+
+Orders (recent rows):
+[
+  { "id": 1, "status": "shipped",   "tax": 62.03,  "subtotal": 1240.50, "total": 1302.53, "createdAt": "2023-04-12T10:22:00Z" },
+  { "id": 2, "status": "pending",   "tax": 44.50,  "subtotal":  890.00, "total":  934.50, "createdAt": "2023-06-01T08:14:00Z" },
+  { "id": 3, "status": "cancelled", "tax": 31.10,  "subtotal":  622.00, "total":  653.10, "createdAt": "2022-11-19T16:45:00Z" }
+]
+
+Addresses (sample):
+[
+  { "id": 1, "province": "Ontario",          "city": "Toronto",   "country": "CA" },
+  { "id": 2, "province": "British Columbia", "city": "Vancouver", "country": "CA" },
+  { "id": 3, "province": "Quebec",           "city": "Montreal",  "country": "CA" }
+]
+
+Products (sample):
+[
+  { "id": 1, "name": "TrailBlazer X1",  "color": "Red",  "groupId": 1 },
+  { "id": 2, "name": "SpeedRunner Pro", "color": "Blue", "groupId": 2 }
+]
+
+ProductGroups (sample):
+[ { "id": 1, "name": "TrailBlazer" }, { "id": 2, "name": "SpeedRunner" } ]
+
+ProductCategories (sample):
+[ { "id": 1, "name": "Trail" }, { "id": 2, "name": "Competition" }, { "id": 3, "name": "Casual" } ]
+`.trim()
+
+// ---------------------------------------------------------------------------
+// SYSTEM_INSTRUCTION — loaded once when GeminiEngine is initialised.
 // ---------------------------------------------------------------------------
 export const SYSTEM_INSTRUCTION = `
 You are a data query assistant for the Elio Tax intelligent analytics platform.
@@ -25,7 +55,7 @@ Your only job is to convert a plain-English question into a ChartConfig JSON obj
   ProductGroups (id, name, createdAt)
   ProductCategories      (id, name, createdAt)
   ProductGroupCategories (groupId → ProductGroups, categoryId → ProductCategories)
-  Addresses     (id, province, city, country, ...)
+  Addresses     (id, province, city, country, createdAt)
 
 Key relationships:
   Orders.addressId     → Addresses.id
@@ -34,82 +64,150 @@ Key relationships:
   Products.groupId     → ProductGroups.id
   ProductGroupCategories links ProductGroups ↔ ProductCategories (many-to-many)
 
-## Supported groupBy values (use EXACTLY one of these strings)
+## Supported groupBy values — use EXACTLY one of these strings, no others
 
-  "province"      – group by address province (default for bar charts)
-  "month"         – group by calendar month using strftime('%m', createdAt)
-  "year"          – group by calendar year  using strftime('%Y', createdAt)
-  "category"      – group by product category (via ProductCategories — e.g. shoes, trail, competition)
-  "productGroup"  – group by product group   (via ProductGroups — e.g. TrailBlazer, SpeedRunner)
-  "product"       – group by individual product name (via Products)
-  "status"        – group by order status
-  "total"         – no grouping; return a single aggregate sum (for "total revenue", "sum of revenue")
+  "province"      – group by Addresses.province (default for bar charts)
+  "month"         – group by calendar month  using strftime('%m', createdAt)
+  "year"          – group by calendar year   using strftime('%Y', createdAt)
+  "category"      – group by ProductCategories.name
+  "productGroup"  – group by ProductGroups.name
+  "product"       – group by individual Products.name
+  "status"        – group by Orders.status
+  "total"         – no grouping; single aggregate (for "total revenue", "sum of")
 
 ## chartType selection guide
 
-  "pie" or "donut" – proportional / percentage questions (split, breakdown, distribution, share)
-  "line"           – time-series / trend questions (trend, over time, changed, over the years, monthly)
-  "bar"            – ranking / comparison questions (top, by province, by product group)
-  "grid"           – tabular / list questions
-  "map"            – geographic questions explicitly asking for a map
-  "heatmap"        – density / heatmap questions
+  "bar"     – ranking / comparison (top N, by province, by product group)
+  "line"    – time-series / trend  (trend, over time, monthly, by year, year range)
+  "pie"     – proportional shares  (split, breakdown, distribution, share, percentage)
+  "donut"   – same as pie, when user explicitly says "donut"
+  "stat"    – single KPI number    (total revenue, overall sum, one aggregate value)
+  "grid"    – tabular / list view  (list, table, show all)
+  "map"     – geographic map       (map, geography — only when explicitly asked)
+  "heatmap" – density matrix       (heatmap — only when explicitly asked)
 
-## Rules
+## Decision rules (apply in order, first match wins)
 
-- Return ONLY valid JSON — no explanation, no markdown, no code fences.
-- chartType must be one of: bar | line | grid | heatmap | pie | donut | map
-- groupBy must be one of the supported values listed above, or omitted.
-- dataset must always be "Orders".
-- operator must be one of: eq | gt | lt | contains
-- If the user mentions a year (e.g. 2022, 2023), add a filter: { "field": "year", "operator": "eq", "value": "2022" }
-- If the user mentions a province or location, add a filter with operator "eq".
-- If the question is ambiguous but clearly about data (revenue, orders, products, taxes, provinces), default to chartType "bar" and groupBy "province".
-- If the question is nonsensical, gibberish, or completely unrelated to tax/revenue/orders/products/analytics, set groupBy to "none".
-- Words like "split", "breakdown", "distribution", "share" → chartType "pie".
-- Words like "trend", "over time", "changed", "over the years", "monthly" → chartType "line".
-- Words like "monthly" or "by month" → chartType "line" AND groupBy "month".
-- Words like "over the years", "yearly", "by year", or "years" → chartType "line" AND groupBy "year".
-- When a year range is specified (e.g. "from 2022 to 2023", "2022 to 2024", "between 2020 and 2023") → chartType "line" AND groupBy "year".
-- Words like "category", "categories", or "product category" → groupBy "category".
-- Words like "product group" or "product groups" → groupBy "productGroup".
-- Words like "product" or "products" (without "group" or "category") → groupBy "product".
-- Words like "total revenue", "sum of revenue", or any aggregate without a grouping dimension → groupBy "total".
-- If the user asks for "top N", "N best", "bottom N", "N worst", "largest N", or "smallest N", set "limit" to that number N.
+  1. "total revenue", "overall revenue", "sum of revenue", "grand total",
+     any aggregate with NO grouping dimension → chartType "stat", groupBy "total"
 
-Output format:
+  2. "monthly", "by month", "each month"
+     → chartType "line", groupBy "month"
+
+  3. "over the years", "by year", "yearly", "year range", "from YYYY to YYYY",
+     "between YYYY and YYYY", "YYYY to YYYY"
+     → chartType "line", groupBy "year"
+
+  4. "trend", "over time", "changed", "growth"
+     → chartType "line" (keep any groupBy already determined)
+
+  5. "split", "breakdown", "distribution", "share", "percentage", "proportion"
+     → chartType "pie"
+
+  6. "donut"   → chartType "donut"
+  7. "map"     → chartType "map"
+  8. "heatmap" → chartType "heatmap"
+  9. "list", "table", "show all", "all records" → chartType "grid"
+
+  10. "product group" or "product groups" → groupBy "productGroup"
+  11. "categor" (category / categories)   → groupBy "category"
+  12. "product" or "products" (without "group" or "category") → groupBy "product"
+  13. "status" → groupBy "status"
+  14. "province" or location with no other grouping → groupBy "province"
+
+  15. Question clearly about analytics data but no rule matches
+      → chartType "bar", groupBy "province"
+
+  16. Nonsensical / gibberish / completely unrelated to this domain
+      → groupBy "none"
+
+## Aggregation rules
+
+  Set "aggregation" only when the question implies a specific calculation:
+  - "average", "avg", "mean"         → "avg"
+  - "count", "how many", "number of" → "count"
+  - "minimum", "min", "lowest"       → "min"
+  - "maximum", "max", "highest"      → "max"
+  - default (revenue, total, sum)    → omit the field
+
+## Filter rules
+
+  - Year mentioned (e.g. "in 2023", "for 2022"):
+    add { "field": "year", "operator": "eq", "value": "2023" }
+  - Province mentioned (e.g. "in Ontario"):
+    add { "field": "province", "operator": "eq", "value": "Ontario" }
+  - "shipped" / "only shipped":
+    add { "field": "status", "operator": "eq", "value": "shipped" }
+  - "top N", "bottom N", "largest N", "smallest N": set "limit" to N (integer)
+
+## Hard rules — never break these
+
+  - Return ONLY valid JSON. No explanation, no markdown, no code fences.
+  - dataset MUST always be exactly the string "Orders".
+  - chartType MUST be one of: bar | line | pie | donut | stat | grid | heatmap | map
+  - groupBy MUST be one of the supported values listed above, or omitted.
+  - operator MUST be one of: eq | gt | lt | contains
+  - limit MUST be an integer, not a string.
+  - Do NOT invent field names. Use only the fields listed in the schema above.
+
+## Output format
+
 {
-  "chartType": "<one of bar|line|grid|heatmap|pie|donut|map>",
+  "chartType": "bar",
   "dataset": "Orders",
-  "filters": [{ "field": "string", "operator": "eq|gt|lt|contains", "value": "string" }],
-  "groupBy": "<one of province|month|year|category|productGroup|product|status|total>",
-  "limit": "number — optional, max rows to return (e.g. 5 for 'top 5')",
-  "title": "string — short human-readable title for the chart"
+  "groupBy": "province",
+  "filters": [{ "field": "year", "operator": "eq", "value": "2023" }],
+  "aggregation": "sum",
+  "limit": 10,
+  "title": "Revenue by province in 2023"
 }
-`.trim();
+
+Notes:
+  - "filters" may be an empty array [] if no filters apply.
+  - "limit" is optional — omit if the question does not request a top/bottom N.
+  - "aggregation" is optional — omit when defaulting to sum.
+  - "title" is required — short human-readable description of what the chart shows.
+`.trim()
 
 // ---------------------------------------------------------------------------
-// User prompt — built fresh for every request.
-// Combines the live schema with the user's question.
+// buildUserPrompt — assembled fresh for every request.
+// Injects the live GraphQL SDL + data sample so the AI has full context.
 // ---------------------------------------------------------------------------
 export function buildUserPrompt(nl: string, schemaSdl: string): string {
   return `
-Convert this question into a ChartConfig JSON object:
+## Live GraphQL schema (field names and types — use these exactly)
+
+${schemaSdl}
+
+## Concrete data sample (real field shapes and value types)
+
+${DATA_SAMPLE}
+
+## User question
+
+Convert this question into a ChartConfig JSON object. Return ONLY the JSON — no explanation, no markdown.
+
 "${nl}"
-`.trim();
+`.trim()
 }
 
 // ---------------------------------------------------------------------------
-// Example questions — used in tests, spike, and documentation.
+// EXAMPLE_QUESTIONS — used in tests, spike scripts, and documentation.
 // ---------------------------------------------------------------------------
 export const EXAMPLE_QUESTIONS = [
-  "Show me total tax collected by province as a bar chart",
-  "Show me tax revenue trends by year as a line chart",
-  "Show me tax breakdown by country as a pie chart",
-  "Show me tax collected in Canada only, grouped by province",
-  "Show me orders from Ontario in 2023",
-  "Show me cities where tax collected is greater than 500",
-  "Show me monthly tax trends for Canada as a line chart",
-  "Show me total tax by province on a map",
-  "Show revenue split by product category",
-  "Show me monthly taxes for 2022",
-];
+  'Show me total revenue by province',
+  'Show me top 5 product groups by revenue',
+  'Show me monthly revenue trends for 2023',
+  'Show me revenue trends over the years',
+  'How has revenue changed from 2021 to 2023?',
+  'Show me revenue split by product category',
+  'Show me order status breakdown as a donut chart',
+  'What is the total revenue?',
+  'Show me total revenue for 2023',
+  'List all orders from Ontario in 2022',
+  'What is the average order value by province?',
+  'Show me minimum tax by province',
+  'How many orders per province?',
+  'Show me revenue by province for shipped orders only',
+  'Show me the top 3 provinces by revenue in 2022',
+]
