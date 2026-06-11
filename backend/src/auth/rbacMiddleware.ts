@@ -13,7 +13,7 @@ const UNAUTHORIZED_RESPONSE = {
 
 const FORBIDDEN_RESPONSE = {
   error: "Forbidden",
-  message: "Admin role required",
+  message: "Admin or Analyst role required",
 };
 
 function getJwtSecret(): string {
@@ -42,7 +42,7 @@ function isJWTPayload(payload: unknown): payload is JWTPayload {
   );
 }
 
-export const requireAdminJWT: RequestHandler = (req, res, next) => {
+export const requireAdminOrAnalystJWT: RequestHandler = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -68,7 +68,7 @@ export const requireAdminJWT: RequestHandler = (req, res, next) => {
       return res.status(401).json(UNAUTHORIZED_RESPONSE);
     }
 
-    if (decodedPayload.role !== "admin") {
+    if (!["admin", "analyst"].includes(decodedPayload.role)) {
       return res.status(403).json(FORBIDDEN_RESPONSE);
     }
 
