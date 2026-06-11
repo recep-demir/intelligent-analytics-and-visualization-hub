@@ -37,13 +37,17 @@ function coerce(chartType: ChartType, groupBy: GroupByValue | undefined): {
   chartType: ChartType
   groupBy:   GroupByValue | undefined
 } {
-  if (groupBy === 'none' || groupBy === undefined) {
+  // 'none' is a deliberate "unrecognised query" signal — propagate it untouched
+  if (groupBy === 'none') return { chartType, groupBy: 'none' }
+
+  if (groupBy === undefined) {
     if (chartType === 'stat')    return { chartType,                groupBy: 'total'    }
     if (chartType === 'grid')    return { chartType,                groupBy: undefined  }
     if (chartType === 'map')     return { chartType: 'map',         groupBy: 'province' }
     if (chartType === 'bar')     return { chartType: 'bar',         groupBy: 'province' }
     if (chartType === 'pie')     return { chartType: 'pie',         groupBy: 'status'   }
     if (chartType === 'donut')   return { chartType: 'donut',       groupBy: 'status'   }
+    if (chartType === 'line')    return { chartType: 'line',        groupBy: 'month'    }
     if (chartType === 'heatmap') return { chartType: 'heatmap',     groupBy: 'province' }
     // treemap is the default fallback — no explicit chart type was requested
     return { chartType: 'treemap', groupBy: 'province' }

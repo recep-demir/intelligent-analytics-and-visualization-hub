@@ -46,10 +46,9 @@ export async function startServer(): Promise<void> {
 
     const engine = process.env.GEMINI_API_KEY
       ? new GeminiEngine(process.env.GEMINI_API_KEY)
-      : null;
-
-    const adapter = engine ? new AIAdapter(engine) : null;
-    const engineName = engine ? "Gemini" : "Local";
+      : new LocalEngine();
+    const adapter = new AIAdapter(engine);
+    const engineName = process.env.GEMINI_API_KEY ? "Gemini" : "Local";
     console.log(`🧠 AI Engine: ${engineName}`);
 
     const app = express();
@@ -67,19 +66,14 @@ export async function startServer(): Promise<void> {
         const question = rawQuestion.trim();
         console.log(`🤖 Incoming AI Query: "${question}"`);
 
-        // Step 1 — AI resolution (Gemini primary, LocalEngine fallback inside adapter)
+        // Step 1 — AI resolution (adapter always wraps engine with cache + fallback)
         const schemaSdl = print(typeDefs);
-        const aiResult = adapter
-          ? await Promise.race([
-              adapter.resolve({ nl: question }, schemaSdl),
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Timeout")), 5000),
-              ),
-            ])
-          : await (async () => {
-              const config = await new LocalEngine().resolve(question, schemaSdl);
-              return { chartConfig: config, fromCache: false };
-            })();
+        const aiResult = await Promise.race([
+          adapter.resolve({ nl: question }, schemaSdl),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 5000),
+          ),
+        ]);
 
         console.log(
           `✅ Resolved: chartType=${aiResult.chartConfig.chartType} groupBy=${aiResult.chartConfig.groupBy}`,

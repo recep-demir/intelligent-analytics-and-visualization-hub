@@ -32,19 +32,24 @@ export class LocalEngine implements AIEngine {
     const hasDimension =
       / by (province|year|month|status|category|product)/i.test(q) ||
       /\b(monthly|yearly|annually|each year|each month|by year|by month)\b/.test(q);
-    if (!hasDimension && (
-      /\b(what is|how much|overall)\b/.test(q) ||
+    // breakdown/distribution/split/share always imply a dimensional chart — never stat
+    const isComparative = /\b(breakdown|distribution|split|proportion|share|percentage|percent)\b/.test(q);
+    if (!hasDimension && !isComparative && (
+      /\b(what is|how much|overall|how many)\b/.test(q) ||
       /\btotal (revenue|tax|orders?|sales|amount)\b/.test(q) ||
       /\b(average|avg) (order|revenue|tax)\b/.test(q)
     )) return "stat";
 
     // Semantic fallbacks
+    if (q.includes("pie")) return "pie";
     if (
-      q.includes("pie") ||
-      q.includes("split") ||
-      q.includes("breakdown") ||
-      q.includes("distribution")
-    ) return "pie";
+      q.includes("split")        ||
+      q.includes("breakdown")    ||
+      q.includes("distribution") ||
+      q.includes("share")        ||
+      q.includes("percentage")   ||
+      q.includes("proportion")
+    ) return "donut";
     if (
       q.includes("line")           ||
       q.includes("trend")          ||
@@ -59,22 +64,49 @@ export class LocalEngine implements AIEngine {
       q.includes("each year")
     ) return "line";
 
-    return "treemap";
+    // Status has few distinct values — donut shows proportions better than bar
+    if (/ by status\b/i.test(q)) return "donut";
+
+    // Explicit comparison — "by <non-geographic dimension>" or "compare"
+    if (/ by (category|product|region)\b/i.test(q) ||
+        /\b(compare|comparison|ranking|rank)\b/.test(q)) return "bar";
+
+    // Province queries: ranking/superlative → bar; geographic overview → map
+    if (/\bprovince[s]?\b/i.test(q)) {
+      if (/ by province\b/i.test(q) ||
+          /\b(top|bottom|best|worst|highest|lowest|most|least|largest|smallest)\b/.test(q))
+        return "bar";
+      return "map";
+    }
+
+    // Category / product group hierarchy → treemap
+    if (q.includes("categor") || q.includes("product group")) return "treemap";
+
+    // Non-geographic dimensions → bar
+    if (q.includes("status") || (q.includes("product") && !q.includes("product group"))) return "bar";
+
+    // Default → map (geographic overview is the natural fallback for a Canadian tax platform)
+    return "map";
   }
 
   private detectDataset(q: string): string {
     if (q.includes("town") || q.includes("city")) return "towns";
-    return "tax_records";
+    return "Orders";
   }
 
   private detectGroupBy(q: string): GroupByValue | undefined {
+    // No analytics keywords → unrecognised query; server returns the "I don't know" message
+    const hasAnalyticsKeyword = /\b(revenue|sales|tax|orders?|amount|province|categor|product|status|year|month|total|average|avg|count|heatmap|map|chart|bar|pie|treemap|line|trend|breakdown|distribution)\b/.test(q);
+    if (!hasAnalyticsKeyword) return 'none';
+
     if (q.includes("product group")) return "productGroup";
+    if (q.includes("categor"))       return "category";
     if (q.includes("province"))      return "province";
+    if (q.includes("status"))        return "status";
+    if (q.includes("product"))       return "product";
+    // year/month last — they are heatmap column dims, not row dims
     if (q.includes("year"))          return "year";
     if (q.includes("month"))         return "month";
-    if (q.includes("categor"))       return "category";
-    if (q.includes("product"))       return "product";
-    if (q.includes("status"))        return "status";
     return undefined;
   }
 
@@ -116,6 +148,14 @@ export class LocalEngine implements AIEngine {
       }
     }
 
+    // Status filter
+    const orderStatuses = ['shipped', 'paid', 'cart', 'pending', 'cancelled', 'refunded'];
+    for (const s of orderStatuses) {
+      if (q.includes(s)) {
+        filters.push({ field: 'status', operator: 'eq', value: s });
+      }
+    }
+
     // Year filter — single year, explicit range, or discrete years ("for 2022 and 2024")
     const yearMatches = [...new Set([...q.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]))].sort();
     if (yearMatches.length >= 2) {
@@ -144,19 +184,18 @@ export class LocalEngine implements AIEngine {
     const numSupMatch = q.match(numSupPattern);
     if (numSupMatch) return parseInt(numSupMatch[1], 10);
 
-    // Numbered — "top 5", "bottom 10", "5 best", "3 worst"
+    // Numbered prefix/suffix — "top 5", "bottom 10", "5 best", "3 worst"
+    // Must run before bare-superlative so "largest 5" / "top 5" aren't shadowed
     const prefixPattern = /\b(?:top|bottom|largest|smallest)\s+(\d+)\b/;
     const suffixPattern = /\b(\d+)\s+(?:best|worst|top|bottom|largest|smallest)\b/;
+    const prefixMatch = q.match(prefixPattern);
+    if (prefixMatch) return parseInt(prefixMatch[1], 10);
+    const suffixMatch = q.match(suffixPattern);
+    if (suffixMatch) return parseInt(suffixMatch[1], 10);
 
     // Bare superlative — "the highest province" → limit 1
     if (/\b(highest|most|largest|biggest|best)\b/.test(q))  return 1;
     if (/\b(lowest|least|smallest|fewest|worst)\b/.test(q)) return 1;
-
-    const prefixMatch = q.match(prefixPattern);
-    if (prefixMatch) return parseInt(prefixMatch[1], 10);
-
-    const suffixMatch = q.match(suffixPattern);
-    if (suffixMatch) return parseInt(suffixMatch[1], 10);
 
     return undefined;
   }
