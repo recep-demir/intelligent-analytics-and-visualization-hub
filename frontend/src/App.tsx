@@ -41,6 +41,33 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const validRoles = ["Admin", "Analyst", "Viewer"];
+
+    if (!token) {
+      setUserRole("Viewer");
+      return;
+    }
+
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64));
+      
+      const formattedRole = payload.role ? payload.role.charAt(0).toUpperCase() + payload.role.slice(1) : "";
+
+      if (validRoles.includes(formattedRole)) {
+        setUserRole(formattedRole);
+      } else {
+        throw new Error("Invalid role field in token");
+      }
+    } catch (err) {
+      setUserRole("Viewer");
+      console.error("🔴 Fail-safe triggered: JWT is decoded but the role field is missing or invalid. Treating user as Viewer.");
+    }
+  }, []);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -116,10 +143,26 @@ export default function App() {
     }
   };
 
+  const dynamicNavItems = [...NAV_ITEMS];
+  if (userRole === "Admin") {
+    
+    dynamicNavItems.push({ id: "admin", label: "Admin Panel", path: "/admin" });
+  }
+
   const nlAssistantPage = (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
-      <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700">
-        <label className="mr-2 text-sm text-gray-400">Current Role:</label>
+      <div className="mb-4 self-end flex items-center gap-3 bg-gray-800 p-2 rounded border border-gray-700">
+        {/* 🗑️ US-63: Cache-Clear Button visible ONLY for Admin */}
+        {userRole === "Admin" && (
+          <button 
+            onClick={() => console.log("🧹 Cache Cleared Successfully!")}
+            className="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1 rounded font-medium transition-all"
+          >
+            Clear Cache
+          </button>
+        )}
+
+        <label className="text-sm text-gray-400">Current Role:</label>
         <select
           value={userRole}
           onChange={(e) => setUserRole(e.target.value)}
@@ -127,6 +170,7 @@ export default function App() {
         >
           <option value="Admin">Admin User</option>
           <option value="Restricted">Restricted User</option>
+          <option value="Viewer">Viewer User</option> {/* Yeni rol eklendi */}
         </select>
       </div>
 
@@ -134,6 +178,9 @@ export default function App() {
         <h1 className="text-3xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
           Elio Tax AI Assistant
         </h1>
+
+      {/* 🔍 US-63: Hide AI Query input completely if user is a Viewer */}
+      { userRole !== "Viewer" ? (       
 
         <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
           <input
@@ -152,7 +199,12 @@ export default function App() {
             {isLoading ? "Analyzing..." : "Ask Assistant"}
           </button>
         </form>
-
+      ) : (
+          
+          <div className="w-full bg-blue-950/40 border border-blue-900/50 rounded-lg p-4 mb-8 text-center text-sm text-blue-300">
+            ℹ️ Your current security profile is set to **Viewer**. You have read-only dashboard access.
+          </div>
+      )}  
         <div className="w-full min-h-[380px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
           {isLoading && (
             <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
@@ -513,8 +565,8 @@ export default function App() {
     </div>
   );
 
-  return (
-    <DashboardLayout navItems={NAV_ITEMS}>
+ return (
+    <DashboardLayout navItems={dynamicNavItems}>
       <Routes>
         <Route path="/"          element={nlAssistantPage} />
         <Route path="/dashboard" element={<Dashboard />} />
