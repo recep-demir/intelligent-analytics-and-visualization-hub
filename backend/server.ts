@@ -13,6 +13,7 @@ import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
 import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
+import { authRouter } from "./src/auth/authRoutes";
 
 export async function createApolloServer() {
   await sequelize.authenticate();
@@ -54,6 +55,7 @@ export async function startServer(): Promise<void> {
     const app = express();
     app.use(cors());
     app.use(express.json());
+    app.use("/api/auth", authRouter);
     app.use("/api/admin/users", adminUserRouter);
 
     app.post("/api/ai/query", requireAdminJWT, async (req, res) => {
