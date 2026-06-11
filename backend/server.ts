@@ -7,7 +7,7 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
-import { requireAdminJWT } from "./src/auth/rbacMiddleware";
+import { requireAdminOrAnalystJWT } from "./src/auth/rbacMiddleware";
 
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
@@ -55,7 +55,7 @@ export async function startServer(): Promise<void> {
     app.use(cors());
     app.use(express.json());
 
-    app.post("/api/ai/query", requireAdminJWT, async (req, res) => {
+    app.post("/api/ai/query", requireAdminOrAnalystJWT, async (req, res) => {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
@@ -299,7 +299,7 @@ export async function startServer(): Promise<void> {
             chartType: dynamicChartType,
             filters: filters,
             groupBy: computedGroupBy,
-            dataset: hybridDataset, // Passes Jest array evaluations and outputs a safe string to the client JSON
+            dataset: hybridDataset,
           },
           fromCache: isFromCache || (aiResult?.fromCache ?? false),
           data: finalDataPayload ?? [],
