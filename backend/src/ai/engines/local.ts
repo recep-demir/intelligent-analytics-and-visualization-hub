@@ -41,10 +41,9 @@ export class LocalEngine implements AIEngine {
     )) return "stat";
 
     // Semantic fallbacks
-    if (q.includes("pie")) return "pie";
+    // "split" / "breakdown" → pie (test contract); "distribution/share/%" → donut
+    if (q.includes("pie") || q.includes("split") || q.includes("breakdown")) return "pie";
     if (
-      q.includes("split")        ||
-      q.includes("breakdown")    ||
       q.includes("distribution") ||
       q.includes("share")        ||
       q.includes("percentage")   ||
@@ -79,8 +78,12 @@ export class LocalEngine implements AIEngine {
       return "map";
     }
 
-    // Category / product group hierarchy → treemap
-    if (q.includes("categor") || q.includes("product group")) return "treemap";
+    // Category / product group: superlative/ranking → bar; hierarchy overview → treemap
+    if (q.includes("categor") || q.includes("product group")) {
+      if (/\b(top|bottom|best|worst|highest|lowest|most|least|largest|smallest)\b/.test(q))
+        return "bar";
+      return "treemap";
+    }
 
     // Non-geographic dimensions → bar
     if (q.includes("status") || (q.includes("product") && !q.includes("product group"))) return "bar";
