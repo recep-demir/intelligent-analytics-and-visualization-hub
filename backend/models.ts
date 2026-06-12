@@ -81,6 +81,120 @@ User.init(
   }
 );
 
+export class SavedChart extends Model {
+  declare id: number;
+  declare title: string;
+  declare question: string | null;
+  declare chartConfigJson: string;
+  declare dataJson: string;
+  declare createdByUserId: number;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+SavedChart.init(
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Untitled chart'
+    },
+    question: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    chartConfigJson: {
+      type: DataTypes.TEXT,
+      allowNull: false
+    },
+    dataJson: {
+      type: DataTypes.TEXT,
+      allowNull: false
+    },
+    createdByUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    }
+  },
+  {
+    sequelize,
+    modelName: 'SavedChart',
+    tableName: 'SavedCharts',
+    timestamps: true
+  }
+);
+
+export class SharedChartLink extends Model {
+  declare id: number;
+  declare savedChartId: number;
+  declare shareToken: string;
+  declare createdByUserId: number;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+SharedChartLink.init(
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    savedChartId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'SavedCharts',
+        key: 'id'
+      }
+    },
+    shareToken: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true
+    },
+    createdByUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    }
+  },
+  {
+    sequelize,
+    modelName: 'SharedChartLink',
+    tableName: 'SharedChartLinks',
+    timestamps: true
+  }
+);
+
+User.hasMany(SavedChart, {
+  foreignKey: 'createdByUserId'
+});
+
+SavedChart.belongsTo(User, {
+  foreignKey: 'createdByUserId'
+});
+
+SavedChart.hasMany(SharedChartLink, {
+  foreignKey: 'savedChartId'
+});
+
+SharedChartLink.belongsTo(SavedChart, {
+  foreignKey: 'savedChartId'
+});
+
 try {
   extendTypes({
     Query: {
