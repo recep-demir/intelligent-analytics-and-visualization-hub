@@ -27,7 +27,7 @@ export function AdminPanel() {
       });
       if (!response.ok) throw new Error("Failed to fetch user list (401/403).");
       const data = await response.json();
-      setUsers(data);
+      setUsers(data.users);
     } catch (err) {
       console.error(err);
     }
