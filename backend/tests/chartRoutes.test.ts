@@ -282,7 +282,7 @@ describe("chart routes", () => {
     });
   });
 
-    it("returns 403 when viewer tries to create a share link", async () => {
+  it("returns 403 when viewer tries to create a share link", async () => {
     const analyst = await createUser("analyst", "analyst@example.com");
     const viewer = await createUser("viewer", "viewer@example.com");
 
