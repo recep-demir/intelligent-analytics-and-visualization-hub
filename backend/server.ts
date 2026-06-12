@@ -7,6 +7,8 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
+import { requireAdminOrAnalystJWT } from "./src/auth/rbacMiddleware";
+import { chartRouter, sharedChartRouter } from "./src/charts/chartRoutes";
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
@@ -59,8 +61,9 @@ export async function startServer(): Promise<void> {
     app.use(express.json());
     app.use("/api/auth", authRouter);
     app.use("/api/admin/users", adminUserRouter);
-
-    app.post("/api/ai/query", async (req, res) => {
+    app.use("/api/charts", chartRouter);
+    app.use("/api/shared-charts", sharedChartRouter);
+    app.post("/api/ai/query", requireAdminOrAnalystJWT, async (req, res) => {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
@@ -147,6 +150,8 @@ export async function startServer(): Promise<void> {
       console.log(`🧠 AI Query Route ready at: http://localhost:${PORT}/api/ai/query (POST)`);
       console.log(`🔐 Auth Login ready at: http://localhost:${PORT}/api/auth/login`);
       console.log(`👤 Admin User Management ready at: http://localhost:${PORT}/api/admin/users`);
+      console.log(`📊 Chart Management ready at: http://localhost:${PORT}/api/charts`);
+      console.log(`🔗 Shared Chart Links ready at: http://localhost:${PORT}/api/shared-charts`);
     });
   } catch (error) {
     console.error("🔴 Failed to start server:", error);
