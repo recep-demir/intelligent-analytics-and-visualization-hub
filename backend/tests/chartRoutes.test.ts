@@ -281,4 +281,45 @@ describe("chart routes", () => {
       shareToken: "test-share-token",
     });
   });
+
+  it("returns 403 when viewer tries to create a share link", async () => {
+    const analyst = await createUser("analyst", "analyst@example.com");
+    const viewer = await createUser("viewer", "viewer@example.com");
+
+    const chart = await SavedChart.create({
+      title: "Viewer restricted chart",
+      question: "Show revenue by province",
+      chartConfigJson: JSON.stringify({ chartType: "bar" }),
+      dataJson: JSON.stringify([{ name: "Ontario", value: 1000 }]),
+      createdByUserId: analyst.id,
+    });
+
+    const token = createToken("viewer", viewer.id);
+
+    const response = await request(app)
+      .post(`/api/charts/${chart.id}/share`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      error: "Forbidden",
+      message: "Admin or Analyst role required",
+    });
+  });
+
+  it("returns 404 when viewer opens a missing shared chart link", async () => {
+    const viewer = await createUser("viewer", "viewer@example.com");
+    const token = createToken("viewer", viewer.id);
+
+    const response = await request(app)
+      .get("/api/shared-charts/missing-share-token")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      error: "Not Found",
+      message: "Shared chart not found",
+    });
+  });
 });
+
