@@ -1,7 +1,7 @@
 import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import type { NextFunction, Request, Response } from "express";
 import jwt = require("jsonwebtoken");
-import { requireAdminJWT } from "../src/auth/rbacMiddleware";
+import { requireAdminOrAnalystJWT } from "../src/auth/rbacMiddleware";
 
 const TEST_SECRET = "test-secret";
 
@@ -44,7 +44,7 @@ function createToken(
   );
 }
 
-describe("requireAdminJWT", () => {
+describe("requireAdminOrAnalystJWT", () => {
   beforeEach(() => {
     process.env.JWT_SECRET = TEST_SECRET;
   });
@@ -59,27 +59,24 @@ describe("requireAdminJWT", () => {
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).not.toHaveBeenCalled();
   });
 
-  it("returns 403 for a valid analyst JWT", () => {
+  it("allows requests with a valid analyst JWT", () => {
     const token = createToken("analyst");
     const req = createMockRequest(token) as Request;
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      error: "Forbidden",
-      message: "Admin role required",
-    });
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
   });
 
   it("returns 403 for a valid viewer JWT", () => {
@@ -88,13 +85,13 @@ describe("requireAdminJWT", () => {
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
       error: "Forbidden",
-      message: "Admin role required",
+      message: "Admin or Analyst role required",
     });
   });
 
@@ -103,7 +100,7 @@ describe("requireAdminJWT", () => {
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
@@ -118,7 +115,7 @@ describe("requireAdminJWT", () => {
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
@@ -134,7 +131,7 @@ describe("requireAdminJWT", () => {
     const res = createMockResponse();
     const next = jest.fn() as NextFunction;
 
-    requireAdminJWT(req, res as Response, next);
+    requireAdminOrAnalystJWT(req, res as Response, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(401);
