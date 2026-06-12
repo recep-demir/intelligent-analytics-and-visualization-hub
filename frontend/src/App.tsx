@@ -155,7 +155,7 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000"\;
       const response = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
