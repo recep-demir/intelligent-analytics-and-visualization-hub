@@ -7,6 +7,8 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
+import { requireAdminOrAnalystJWT } from "./src/auth/rbacMiddleware";
+
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
@@ -60,7 +62,7 @@ export async function startServer(): Promise<void> {
     app.use("/api/auth", authRouter);
     app.use("/api/admin/users", adminUserRouter);
 
-    app.post("/api/ai/query", async (req, res) => {
+    app.post("/api/ai/query", requireAdminOrAnalystJWT, async (req, res) => {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
