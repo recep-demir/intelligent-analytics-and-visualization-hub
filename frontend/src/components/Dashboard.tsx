@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,7 +14,7 @@ import {
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
-import { useDashboardStats } from "../hooks/useDashboardStats";
+import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
 import type { KpiData } from "../types/dashboard";
 
 ChartJS.register(
@@ -74,8 +75,27 @@ function formatCurrency(value: number): string {
     : `CA$${value.toFixed(0)}`;
 }
 
+const YEARS     = [2022, 2023, 2024, 2025];
+const PROVINCES = ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Nova Scotia","Ontario","Prince Edward Island","Quebec","Saskatchewan"];
+const STATUSES  = ["pending","paid","shipped","cancelled","refunded"];
+const CATEGORIES = ["shoes","apparel"];
+
+const SELECT_CLS = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
+
 export function Dashboard() {
-  const { data, loading, error } = useDashboardStats();
+  const [filters, setFilters] = useState<DashboardFilters>({ year: null, province: null, status: null, category: null });
+  const { data, loading, error } = useDashboardStats(filters);
+
+  function set(key: keyof DashboardFilters, raw: string) {
+    const value = raw === "" ? null : key === "year" ? Number(raw) : raw;
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }
+
+  function clearFilters() {
+    setFilters({ year: null, province: null, status: null, category: null });
+  }
+
+  const isFiltered = Object.values(filters).some(v => v != null);
 
   if (loading) {
     return (
@@ -150,11 +170,44 @@ export function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
+        {isFiltered && (
+          <button
+            onClick={clearFilters}
+            className="text-sm text-blue-400 hover:text-blue-300 underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-wrap gap-3 bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <select className={SELECT_CLS} value={filters.year ?? ""} onChange={e => set("year", e.target.value)}>
+          <option value="">All years</option>
+          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+
+        <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
+          <option value="">All provinces</option>
+          {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+
+        <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
+          <option value="">All statuses</option>
+          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
+          <option value="">All categories</option>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label="Total Revenue (2023+)"  value={formatCurrency(kpis.totalRevenue)} subtitle="paid + shipped orders" />
+        <KpiCard label={isFiltered ? "Total Revenue (filtered)" : "Total Revenue (2023+)"} value={formatCurrency(kpis.totalRevenue)} subtitle="paid + shipped orders" />
         <KpiCard label="Completed Orders"        value={kpis.completedOrders.toLocaleString()} />
         <KpiCard label="Avg Order Value"         value={formatCurrency(kpis.avgOrderValue)} />
         <KpiCard label="Conversion Rate"         value={`${kpis.conversionRate.toFixed(1)}%`} subtitle="completed ÷ all orders" />

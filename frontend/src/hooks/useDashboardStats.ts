@@ -1,17 +1,12 @@
 import { useState, useEffect } from "react";
 import type { DashboardStats } from "../types/dashboard";
 
-const DASHBOARD_QUERY = `
-  query {
-    dashboardStats {
-      monthlyRevenue   { month revenue }
-      ordersByStatus   { status count }
-      topProductGroups { name revenue }
-      topProvinces     { province orders }
-      categoryRevenue  { category revenue }
-    }
-  }
-`;
+export interface DashboardFilters {
+  year?:     number | null;
+  province?: string | null;
+  status?:   string | null;
+  category?: string | null;
+}
 
 interface UseDashboardStatsResult {
   data:    DashboardStats | null;
@@ -19,7 +14,30 @@ interface UseDashboardStatsResult {
   error:   string | null;
 }
 
-export function useDashboardStats(): UseDashboardStatsResult {
+function buildQuery(filters: DashboardFilters): string {
+  const args: string[] = [];
+
+  if (filters.year)     args.push(`year: ${filters.year}`);
+  if (filters.province) args.push(`province: "${filters.province}"`);
+  if (filters.status)   args.push(`status: "${filters.status}"`);
+  if (filters.category) args.push(`category: "${filters.category}"`);
+
+  const argStr = args.length > 0 ? `(${args.join(", ")})` : "";
+
+  return `
+    query {
+      dashboardStats${argStr} {
+        monthlyRevenue   { month revenue }
+        ordersByStatus   { status count }
+        topProductGroups { name revenue }
+        topProvinces     { province orders }
+        categoryRevenue  { category revenue }
+      }
+    }
+  `;
+}
+
+export function useDashboardStats(filters: DashboardFilters = {}): UseDashboardStatsResult {
   const [data,    setData]    = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -28,13 +46,15 @@ export function useDashboardStats(): UseDashboardStatsResult {
     const controller = new AbortController();
 
     async function fetchStats() {
+      setLoading(true);
+      setError(null);
       try {
         const apiUrl = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:4000";
         const response = await fetch(`${apiUrl}/graphql`, {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           signal:  controller.signal,
-          body:    JSON.stringify({ query: DASHBOARD_QUERY }),
+          body:    JSON.stringify({ query: buildQuery(filters) }),
         });
 
         if (!response.ok) {
@@ -58,7 +78,7 @@ export function useDashboardStats(): UseDashboardStatsResult {
 
     fetchStats();
     return () => controller.abort();
-  }, []);
+  }, [filters.year, filters.province, filters.status, filters.category]);
 
   return { data, loading, error };
 }
