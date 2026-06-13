@@ -3,7 +3,7 @@
   grid-template-columns: 260px 1fr;
   min-height: 100vh;
   /* 🌟 FIX: Updated from #f3f4f6 to match the dark theme */
-  background-color: #111827; 
+  background-color: #111827;
   font-family: system-ui, -apple-system, sans-serif;
   margin: 0;
 }
@@ -26,5 +26,5 @@
 .mainContent {
   padding: 2.5rem;
   /* 🌟 FIX: Soft white text color for readability on dark background */
-  color: #f8fafc; 
+  color: #f8fafc;
 }

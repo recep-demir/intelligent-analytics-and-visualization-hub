@@ -1,6 +1,6 @@
+import React, { useEffect, useRef, useState } from "react";
+import { Route, Routes } from "react-router-dom";
 import { AdminPanel } from "./components/AdminPanel";
-import React, { useState, useEffect, useRef } from "react";
-import { Routes, Route } from "react-router-dom";
 import {
   ComposableMap,
   Geographies,
@@ -1162,22 +1162,6 @@ export default function App() {
           <option value="analyst">Analyst User</option>
           <option value="admin">Admin User</option>
         </select>
-
-        {/* 🧭 US-64 & B-3: Cache-Clear visibility rules - Keep active but dev-gated to protect session tokens */}
-        {/* {userRole.toLowerCase() === "admin" && (
-          <button
-            onClick={() => {
-              localStorage.clear();
-              setChartData(null);
-              setError(null);
-              alert("Cache cleared successfully!");
-            }}
-            className="bg-red-600 hover:bg-red-500 text-white text-[11px] font-medium px-3 py-1 rounded transition-colors shadow-md w-full sm:w-auto"
-          >
-            Clear Cache
-          </button>
-        )}
-        */}
       </div>
 
       <main className="flex-1 max-w-5xl w-full mx-auto flex flex-col">

@@ -6,30 +6,57 @@ interface User {
   role: "admin" | "analyst" | "viewer";
 }
 
+function getAuthHeaders(includeJson = false): HeadersInit {
+  const token = localStorage.getItem("token");
+
+  return {
+    ...(includeJson ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export function AdminPanel() {
   const [users, setUsers] = useState<User[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("viewer"); // Default to viewer
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isFetchingUsers, setIsFetchingUsers] = useState(false);
+  const [fetchUsersError, setFetchUsersError] = useState<string | null>(null);
 
   const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-  const token = localStorage.getItem("token");
 
   // 🔄 1. Fetch All Users (GET /api/admin/users)
   const fetchUsers = async () => {
+    setIsFetchingUsers(true);
+    setFetchUsersError(null);
+
     try {
       const response = await fetch(`${API_URL}/api/admin/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
-      if (!response.ok) throw new Error("Failed to fetch user list (401/403).");
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || "Failed to fetch user list (401/403).",
+        );
+      }
+
       const data = await response.json();
       setUsers(data.users);
     } catch (err) {
       console.error(err);
+      setUsers([]);
+      setFetchUsersError(
+        err instanceof Error ? err.message : "Failed to fetch user list.",
+      );
+    } finally {
+      setIsFetchingUsers(false);
     }
   };
 
@@ -46,10 +73,7 @@ export function AdminPanel() {
     try {
       const response = await fetch(`${API_URL}/api/admin/users`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({ email, password, role }),
       });
 
@@ -58,13 +82,20 @@ export function AdminPanel() {
         throw new Error(errorData.message || "Account creation failed.");
       }
 
-      setMessage({ type: "success", text: "✨ User account created successfully!" });
+      setMessage({
+        type: "success",
+        text: "✨ User account created successfully!",
+      });
       setEmail("");
       setPassword("");
       setRole("viewer");
       fetchUsers(); // Refresh the list
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "An unexpected error occurred." });
+      setMessage({
+        type: "error",
+        text:
+          err instanceof Error ? err.message : "An unexpected error occurred.",
+      });
     } finally {
       setLoading(false);
     }
@@ -73,21 +104,28 @@ export function AdminPanel() {
   // 🔄 3. Update User Role (PATCH /api/admin/users/:id/role)
   const handleRoleUpdate = async (userId: string, newRole: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/api/admin/users/${userId}/role`,
+        {
+          method: "PATCH",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({ role: newRole }),
         },
-        body: JSON.stringify({ role: newRole }),
-      });
+      );
 
       if (!response.ok) throw new Error("Failed to update role.");
-      
+
       // Update the list locally in real-time
-      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole as any } : u));
-    } catch (err) {
-      alert("🔴 You do not have permission to update roles or an error occurred.");
+      setUsers(
+        users.map((u) =>
+          u.id === userId ? { ...u, role: newRole as User["role"] } : u,
+        ),
+      );
+    } catch {
+      setMessage({
+        type: "error",
+        text: "🔴 You do not have permission to update roles or an error occurred.",
+      });
     }
   };
 
@@ -100,11 +138,15 @@ export function AdminPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* LEFT SIDE: Create New User Form */}
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 h-fit">
-          <h2 className="text-xl font-semibold mb-4 text-blue-400">Create New Account</h2>
-          
+          <h2 className="text-xl font-semibold mb-4 text-blue-400">
+            Create New Account
+          </h2>
+
           <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
-              <label className="block text-xs text-gray-400 mb-1 font-mono">EMAIL ADDRESS</label>
+              <label className="block text-xs text-gray-400 mb-1 font-mono">
+                EMAIL ADDRESS
+              </label>
               <input
                 type="email"
                 required
@@ -116,7 +158,9 @@ export function AdminPanel() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1 font-mono">PASSWORD</label>
+              <label className="block text-xs text-gray-400 mb-1 font-mono">
+                PASSWORD
+              </label>
               <input
                 type="password"
                 required
@@ -128,7 +172,9 @@ export function AdminPanel() {
             </div>
 
             <div>
-              <label className="block text-xs text-gray-400 mb-1 font-mono">ASSIGN SYSTEM ROLE</label>
+              <label className="block text-xs text-gray-400 mb-1 font-mono">
+                ASSIGN SYSTEM ROLE
+              </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -150,9 +196,13 @@ export function AdminPanel() {
           </form>
 
           {message && (
-            <div className={`mt-4 p-3 rounded-lg text-xs text-center font-medium ${
-              message.type === "success" ? "bg-emerald-950/40 text-emerald-300 border border-emerald-900/50" : "bg-red-950/40 text-red-300 border border-red-900/50"
-            }`}>
+            <div
+              className={`mt-4 p-3 rounded-lg text-xs text-center font-medium ${
+                message.type === "success"
+                  ? "bg-emerald-950/40 text-emerald-300 border border-emerald-900/50"
+                  : "bg-red-950/40 text-red-300 border border-red-900/50"
+              }`}
+            >
               {message.text}
             </div>
           )}
@@ -160,49 +210,75 @@ export function AdminPanel() {
 
         {/* RIGHT SIDE: Active Users List & Role Management */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-xl p-6">
-          <h2 className="text-xl font-semibold mb-4 text-emerald-400">Active System Users</h2>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="bg-gray-900 text-gray-400 text-xs font-mono uppercase tracking-wider border-b border-gray-700">
-                <tr>
-                  <th className="p-3">User Email</th>
-                  <th className="p-3">Current Role</th>
-                  <th className="p-3 text-right">Quick Access Management</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700/50">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-700/20 transition-all">
-                    <td className="p-3 font-medium text-white">{user.email}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
-                        user.role === "admin" ? "bg-red-950 text-red-400 border border-red-900/30" :
-                        user.role === "analyst" ? "bg-blue-950 text-blue-400 border border-blue-900/30" : "bg-gray-900 text-gray-400 border border-gray-700"
-                      }`}>
-                        {user.role.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      {user.role === "admin" ? (
-                        <span className="text-xs text-gray-500 italic font-mono">Primary Root Admin</span>
-                      ) : (
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
-                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white outline-none cursor-pointer"
-                        >
-                          {/* 🚨 Dropdown restriction is active here as well */}
-                          <option value="viewer">Viewer</option>
-                          <option value="analyst">Analyst</option>
-                        </select>
-                      )}
-                    </td>
+          <h2 className="text-xl font-semibold mb-4 text-emerald-400">
+            Active System Users
+          </h2>
+
+          {isFetchingUsers ? (
+            <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-4 text-sm text-gray-400">
+              Loading users...
+            </div>
+          ) : fetchUsersError ? (
+            <div className="rounded-lg border border-red-900/50 bg-red-950/40 p-4 text-sm text-red-300">
+              {fetchUsersError}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-gray-900 text-gray-400 text-xs font-mono uppercase tracking-wider border-b border-gray-700">
+                  <tr>
+                    <th className="p-3">User Email</th>
+                    <th className="p-3">Current Role</th>
+                    <th className="p-3 text-right">Quick Access Management</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-700/50">
+                  {users.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-gray-700/20 transition-all"
+                    >
+                      <td className="p-3 font-medium text-white">
+                        {user.email}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                            user.role === "admin"
+                              ? "bg-red-950 text-red-400 border border-red-900/30"
+                              : user.role === "analyst"
+                                ? "bg-blue-950 text-blue-400 border border-blue-900/30"
+                                : "bg-gray-900 text-gray-400 border border-gray-700"
+                          }`}
+                        >
+                          {user.role.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        {user.role === "admin" ? (
+                          <span className="text-xs text-gray-500 italic font-mono">
+                            Primary Root Admin
+                          </span>
+                        ) : (
+                          <select
+                            value={user.role}
+                            onChange={(e) =>
+                              handleRoleUpdate(user.id, e.target.value)
+                            }
+                            className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white outline-none cursor-pointer"
+                          >
+                            {/* 🚨 Dropdown restriction is active here as well */}
+                            <option value="viewer">Viewer</option>
+                            <option value="analyst">Analyst</option>
+                          </select>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
