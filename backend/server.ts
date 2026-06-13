@@ -18,12 +18,57 @@ import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
 import { authRouter } from "./src/auth/authRoutes";
 import { adminUserRouter } from "./src/admin/userRoutes";
 
+async function ensureAnalyticsTables() {
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS Addresses (
+      id INTEGER PRIMARY KEY,
+      firstName TEXT,
+      lastName TEXT,
+      address1 TEXT,
+      city TEXT,
+      province TEXT,
+      postalCode TEXT,
+      country TEXT,
+      email TEXT,
+      phone TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    )
+  `);
+
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS Orders (
+      id INTEGER PRIMARY KEY,
+      status TEXT,
+      tax REAL,
+      subtotal REAL,
+      total REAL,
+      addressId INTEGER,
+      createdAt TEXT,
+      updatedAt TEXT
+    )
+  `);
+
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS OrderItems (
+      id INTEGER PRIMARY KEY,
+      price REAL,
+      quantity INTEGER,
+      orderId INTEGER,
+      productId INTEGER,
+      createdAt TEXT,
+      updatedAt TEXT
+    )
+  `);
+}
+
 export async function createApolloServer() {
   await sequelize.authenticate();
   console.log("✅ Database connection established via Sequelize.");
 
   await sequelize.query("PRAGMA foreign_keys = OFF;");
   await sequelize.sync();
+  await ensureAnalyticsTables();
   await sequelize.query("PRAGMA foreign_keys = ON;");
   console.log("✅ Database schemas synchronized.");
 
@@ -67,7 +112,10 @@ export async function startServer(): Promise<void> {
       try {
         const rawQuestion = req.body?.question ?? req.body?.nl;
 
-        if (typeof rawQuestion !== "string" || rawQuestion.trim().length === 0) {
+        if (
+          typeof rawQuestion !== "string" ||
+          rawQuestion.trim().length === 0
+        ) {
           return res.status(400).json({
             error: "Missing question in request body",
           });
@@ -146,12 +194,24 @@ export async function startServer(): Promise<void> {
     const PORT = 4000;
 
     app.listen(PORT, () => {
-      console.log(`🚀 GraphQL Server ready at: http://localhost:${PORT}/graphql`);
-      console.log(`🧠 AI Query Route ready at: http://localhost:${PORT}/api/ai/query (POST)`);
-      console.log(`🔐 Auth Login ready at: http://localhost:${PORT}/api/auth/login`);
-      console.log(`👤 Admin User Management ready at: http://localhost:${PORT}/api/admin/users`);
-      console.log(`📊 Chart Management ready at: http://localhost:${PORT}/api/charts`);
-      console.log(`🔗 Shared Chart Links ready at: http://localhost:${PORT}/api/shared-charts`);
+      console.log(
+        `🚀 GraphQL Server ready at: http://localhost:${PORT}/graphql`,
+      );
+      console.log(
+        `🧠 AI Query Route ready at: http://localhost:${PORT}/api/ai/query (POST)`,
+      );
+      console.log(
+        `🔐 Auth Login ready at: http://localhost:${PORT}/api/auth/login`,
+      );
+      console.log(
+        `👤 Admin User Management ready at: http://localhost:${PORT}/api/admin/users`,
+      );
+      console.log(
+        `📊 Chart Management ready at: http://localhost:${PORT}/api/charts`,
+      );
+      console.log(
+        `🔗 Shared Chart Links ready at: http://localhost:${PORT}/api/shared-charts`,
+      );
     });
   } catch (error) {
     console.error("🔴 Failed to start server:", error);
