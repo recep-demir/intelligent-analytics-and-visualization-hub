@@ -6,7 +6,8 @@ export interface NLQueryRequest {
 
 export interface NLQueryResponse {
   chartConfig: ChartConfig
-  fromCache:   boolean   // true if result came from in-memory cache
+  fromCache:   boolean              // true if result came from in-memory cache
+  engine:      "gemini" | "local"  // which engine produced this result
 }
 
 // Both GPT-4o and local engines must implement this interface

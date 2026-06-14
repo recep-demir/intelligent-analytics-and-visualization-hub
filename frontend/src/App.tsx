@@ -18,62 +18,29 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
 ];
 
-const PROVINCE_CAPITALS: {
-  city: string;
-  anchor: "middle" | "start" | "end";
-  dx: number;
-  dy: number;
-  coords: [number, number];
-}[] = [
-  { city: "Victoria", coords: [-123.37, 48.43], anchor: "end", dx: -3, dy: -4 },
-  {
-    city: "Edmonton",
-    coords: [-113.49, 53.54],
-    anchor: "middle",
-    dx: 0,
-    dy: -4,
-  },
-  { city: "Regina", coords: [-104.62, 50.45], anchor: "middle", dx: 0, dy: -4 },
-  { city: "Winnipeg", coords: [-97.14, 49.9], anchor: "middle", dx: 0, dy: -4 },
-  { city: "Toronto", coords: [-79.38, 43.65], anchor: "start", dx: 3, dy: -4 },
-  { city: "Québec", coords: [-71.21, 46.81], anchor: "end", dx: -4, dy: -3 },
-  {
-    city: "Fredericton",
-    coords: [-66.64, 45.96],
-    anchor: "start",
-    dx: 4,
-    dy: 6,
-  },
-  { city: "Halifax", coords: [-63.58, 44.65], anchor: "start", dx: 4, dy: 7 },
-  {
-    city: "Charlottetown",
-    coords: [-63.13, 46.24],
-    anchor: "end",
-    dx: -4,
-    dy: 6,
-  },
-  {
-    city: "St. John's",
-    coords: [-52.71, 47.56],
-    anchor: "start",
-    dx: 3,
-    dy: -4,
-  },
-  {
-    city: "Whitehorse",
-    coords: [-135.06, 60.72],
-    anchor: "start",
-    dx: 3,
-    dy: -4,
-  },
-  {
-    city: "Yellowknife",
-    coords: [-114.37, 62.45],
-    anchor: "middle",
-    dx: 0,
-    dy: -4,
-  },
-  { city: "Iqaluit", coords: [-68.52, 63.75], anchor: "end", dx: -3, dy: -4 },
+type Capital = { city: string; coords: [number, number]; lx: number; ly: number; anchor: "middle" | "start" | "end" };
+
+// Main map — largest/most recognizable cities per province (excludes Maritimes shown in zoomed inset)
+// lx/ly push labels into open ocean/margin space; nearby cities staggered vertically to avoid overlap
+// Iqaluit routes DOWN to avoid being hidden under the Maritimes inset box (absolute-positioned overlay)
+const PROVINCE_CAPITALS: Capital[] = [
+  { city: "Vancouver",   coords: [-123.12, 49.28], lx: -72, ly:  -5, anchor: "end"    }, // Pacific → far left upper
+  { city: "Calgary",     coords: [-114.07, 51.05], lx: -40, ly:  40, anchor: "end"    }, // Alberta → far left lower (stagger vs Vancouver)
+  { city: "Regina",      coords: [-104.62, 50.45], lx:   0, ly:  55, anchor: "middle" }, // Saskatchewan → straight down
+  { city: "Winnipeg",    coords: [-97.14,  49.90], lx:  48, ly:  52, anchor: "start"  }, // Manitoba → lower right
+  { city: "Toronto",     coords: [-79.38,  43.65], lx:  65, ly:  24, anchor: "start"  }, // Ontario → far right lower
+  { city: "Montréal",    coords: [-73.57,  45.50], lx:  65, ly:  20, anchor: "start"  }, // Quebec → far right upper (stagger vs Toronto)
+  { city: "St. John's",  coords: [-52.71,  47.56], lx:  32, ly: -22, anchor: "start"  }, // NL → right above
+  { city: "Whitehorse",  coords: [-135.06, 60.72], lx: -48, ly: -35, anchor: "end"    }, // Yukon → upper left
+  { city: "Yellowknife", coords: [-114.37, 62.45], lx: -30, ly: -150, anchor: "middle" }, // NWT → far up into Arctic Ocean
+  { city: "Iqaluit",     coords: [-68.52,  63.75], lx:  0, ly:   -80, anchor: "start"  }, // Nunavut → right into Baffin Bay (below inset)
+];
+
+// Maritimes zoomed inset capitals
+const MARITIMES_CAPITALS: Capital[] = [
+  { city: "Fredericton",   coords: [-66.64, 45.96], lx: -14, ly: -10, anchor: "end"   },
+  { city: "Charlottetown", coords: [-63.13, 46.24], lx:  14, ly: -10, anchor: "start" },
+  { city: "Halifax",       coords: [-63.58, 44.65], lx:  14, ly:  14, anchor: "start" },
 ];
 
 function normalizeProvince(s: string): string {
@@ -104,6 +71,10 @@ interface NLQueryResponse {
   fromCache: boolean;
   data?: any[];
   message?: string;
+  insights?: string[];
+  totalOrders?: number;
+  engine?: "gemini" | "local";
+  latencyMs?: number;
 }
 
 const PIE_COLORS = [
@@ -213,6 +184,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<NLQueryResponse | null>(null);
   const [mapTooltip, setMapTooltip] = useState<string | null>(null);
+  const [mapHovered, setMapHovered] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -235,9 +207,14 @@ export default function App() {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+      const token = localStorage.getItem("token");
+      const fetchStart = Date.now();
       const response = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         signal: controller.signal,
         body: JSON.stringify({ nl: query }),
       });
@@ -248,10 +225,17 @@ export default function App() {
       const rawData = await response.json();
 
       if (!Array.isArray(rawData.data) || rawData.data.length === 0) {
-        throw new Error(
-          rawData.message ??
-            "No data returned for this question. Try rephrasing.",
-        );
+        // Server returned a message (unrecognized query, no matching rows, etc.)
+        // Show it as an info panel, not a red error box
+        setChartData({
+          chartConfig: rawData.chartConfig ?? { chartType: "bar", dataset: "Orders", filters: [] },
+          fromCache: rawData.fromCache ?? false,
+          engine: rawData.engine,
+          latencyMs: Date.now() - fetchStart,
+          data: [],
+          message: rawData.message ?? "No data found for this query. Try adjusting your filters.",
+        });
+        return;
       }
 
       setChartData({
@@ -269,8 +253,12 @@ export default function App() {
           title: rawData.chartConfig?.title ?? query,
         },
         fromCache: rawData.fromCache ?? false,
+        engine: rawData.engine,
+        latencyMs: Date.now() - fetchStart,
         data: rawData.data,
         message: rawData.message,
+        insights: Array.isArray(rawData.insights) ? rawData.insights : [],
+        totalOrders: rawData.totalOrders,
       });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
@@ -460,8 +448,8 @@ export default function App() {
           <div className="flex-1">
             <div className="flex gap-1 items-stretch">
               <div
-                className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1 py-1"
-                style={{ width: "52px" }}
+                className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1"
+                style={{ width: "52px", paddingTop: "47px", paddingBottom: "47px" }}
               >
                 <span>{formatVal(maxV, agg)}</span>
                 <span>{formatVal((maxV + minV) / 2, agg)}</span>
@@ -592,8 +580,8 @@ export default function App() {
         <div className="flex-1">
           <div className="flex gap-1 items-stretch">
             <div
-              className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1 py-1"
-              style={{ width: "52px" }}
+              className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1"
+              style={{ width: "52px", paddingTop: "47px", paddingBottom: "47px" }}
             >
               <span>{formatVal(dataMax, agg)}</span>
               <span>{formatVal((dataMax + dataMin) / 2, agg)}</span>
@@ -993,13 +981,13 @@ export default function App() {
         </div>
         <div className="flex items-stretch gap-4">
           <div className="flex-1 relative">
-            <div className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117]">
+            <div className="rounded-xl border border-gray-800/60 bg-[#0d1117]">
               <ComposableMap
                 projection="geoAzimuthalEqualArea"
-                projectionConfig={{ rotate: [96, -60, 0], scale: 500 }}
+                projectionConfig={{ rotate: [96, -63, 0], scale: 590 }}
                 width={800}
                 height={430}
-                style={{ width: "100%", height: "auto", display: "block" }}
+                style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
               >
                 <Geographies geography={CANADA_GEO}>
                   {({ geographies }: { geographies: any[] }) =>
@@ -1014,27 +1002,30 @@ export default function App() {
                         const name = normalizeProvince(rawName);
                         const val = lookup[name] ?? 0;
                         const t = val ? (val - minV) / range : 0;
+                        const isHovered = mapHovered === name;
+                        const anyHovered = mapHovered !== null;
+                        const opacity = anyHovered
+                          ? isHovered ? 1.0 : 0.35
+                          : val ? 0.9 : 0.4;
                         return (
                           <Geography
                             key={geo.rsmKey}
                             geography={geo}
                             fill={val ? heatColor(t) : "#1e2939"}
-                            fillOpacity={val ? 0.9 : 0.4}
-                            stroke="#374151"
-                            strokeWidth={0.4}
-                            onMouseEnter={() =>
-                              setMapTooltip(
-                                `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
-                              )
-                            }
-                            onMouseLeave={() => setMapTooltip(null)}
+                            fillOpacity={opacity}
+                            stroke="#ffffff"
+                            strokeWidth={isHovered ? 1.5 : 0.5}
+                            onMouseEnter={() => {
+                              setMapHovered(name);
+                              setMapTooltip(`${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`);
+                            }}
+                            onMouseLeave={() => {
+                              setMapHovered(null);
+                              setMapTooltip(null);
+                            }}
                             style={{
                               default: { outline: "none" },
-                              hover: {
-                                outline: "none",
-                                fillOpacity: 0.65,
-                                cursor: "pointer",
-                              },
+                              hover: { outline: "none", cursor: "pointer" },
                               pressed: { outline: "none" },
                             }}
                           />
@@ -1043,25 +1034,15 @@ export default function App() {
                     )
                   }
                 </Geographies>
-                {PROVINCE_CAPITALS.map(({ city, coords, anchor, dx, dy }) => (
+                {PROVINCE_CAPITALS.map(({ city, coords, lx, ly, anchor }) => (
                   <Marker key={city} coordinates={coords}>
-                    <circle
-                      r={2.5}
-                      fill="#ffffff"
-                      fillOpacity={0.9}
-                      stroke="#0d1117"
-                      strokeWidth={0.6}
-                    />
+                    <line x1={0} y1={0} x2={lx} y2={ly} stroke="#9ca3af" strokeWidth={0.6} strokeOpacity={0.85} />
+                    <circle r={2.8} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.8} />
                     <text
                       textAnchor={anchor}
-                      x={dx}
-                      y={dy}
-                      style={{
-                        fontSize: "7px",
-                        fill: "#d1d5db",
-                        fontFamily: "sans-serif",
-                        pointerEvents: "none",
-                      }}
+                      x={lx + (anchor === "start" ? 3 : anchor === "end" ? -3 : 0)}
+                      y={ly - 3}
+                      style={{ fontSize: "11px", fill: "#f9fafb", fontFamily: "sans-serif", fontWeight: 700, pointerEvents: "none" }}
                     >
                       {city}
                     </text>
@@ -1084,7 +1065,7 @@ export default function App() {
               return (
                 <div className="absolute top-2 right-2 z-10 w-56 rounded-lg border border-gray-600/70 bg-[#0d1117]/90 overflow-hidden shadow-xl backdrop-blur-sm">
                   <div className="text-[10px] font-bold text-gray-400 tracking-widest uppercase px-2 pt-1.5">
-                    Maritimes · zoomed
+                    Atlantic Provinces
                   </div>
                   <ComposableMap
                     projection="geoAzimuthalEqualArea"
@@ -1106,25 +1087,33 @@ export default function App() {
                             const name = normalizeProvince(rawName);
                             const val = lookup[name] ?? 0;
                             const t = val ? (val - minV) / range : 0;
+                            const isHovered = mapHovered === name;
+                            const anyHovered = mapHovered !== null;
+                            const opacity = anyHovered
+                              ? isHovered ? 1.0 : 0.35
+                              : val ? 0.9 : 0.35;
                             return (
                               <Geography
                                 key={geo.rsmKey}
                                 geography={geo}
                                 fill={val ? heatColor(t) : "#1e2939"}
-                                fillOpacity={val ? 0.9 : 0.35}
-                                stroke="#374151"
-                                strokeWidth={0.8}
-                                onMouseEnter={() =>
-                                  setMapTooltip(
-                                    `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
-                                  )
-                                }
-                                onMouseLeave={() => setMapTooltip(null)}
+                                fillOpacity={opacity}
+                                stroke="#ffffff"
+                                strokeWidth={isHovered ? 1.5 : 0.5}
+                                onMouseEnter={() => {
+                                  setMapHovered(name);
+                                  setMapTooltip(`${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`);
+                                }}
+                                onMouseLeave={() => {
+                                  setMapHovered(null);
+                                  setMapTooltip(null);
+                                }}
                                 style={{
                                   default: { outline: "none" },
                                   hover: {
                                     outline: "none",
-                                    fillOpacity: 0.65,
+                                    fillOpacity: 1.0,
+                                    strokeWidth: 2.0,
                                     cursor: "pointer",
                                   },
                                   pressed: { outline: "none" },
@@ -1135,6 +1124,11 @@ export default function App() {
                         )
                       }
                     </Geographies>
+                    {MARITIMES_CAPITALS.map(({ city, coords }) => (
+                      <Marker key={city} coordinates={coords}>
+                        <circle r={2.5} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.6} />
+                      </Marker>
+                    ))}
                   </ComposableMap>
                 </div>
               );
@@ -1207,8 +1201,9 @@ export default function App() {
           )}
           {error && !isLoading && (
             <div className="flex-1 flex items-center justify-center">
-              <div className="bg-red-900/30 text-red-200 p-4 rounded-lg">
-                {error}
+              <div className="bg-red-900/30 text-red-200 p-4 rounded-lg max-w-md text-center">
+                <p className="font-semibold mb-1">Something went wrong</p>
+                <p className="text-sm text-red-300">Please try again or rephrase your question.</p>
               </div>
             </div>
           )}
@@ -1222,10 +1217,30 @@ export default function App() {
 
           {!isLoading && !error && chartData && (
             <div className="w-full flex-1 flex flex-col gap-3">
-              <h2 className="text-base font-bold text-white text-center tracking-wide">
-                {generateTitle(chartData.chartConfig)}
-              </h2>
+              <div className="relative flex items-center justify-center">
+                <h2 className="text-base font-bold text-white text-center tracking-wide">
+                  {generateTitle(chartData.chartConfig)}
+                </h2>
+                {(() => {
+                  const isCache = chartData.fromCache;
+                  const engine  = chartData.engine;
+                  const ms      = chartData.latencyMs;
+                  const label   = isCache ? "⚡ Cached" : engine === "gemini" ? "✨ AI" : "🔧 LocalEngine";
+                  const latency = ms != null ? ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms` : "";
+                  const color   = isCache ? "text-white-1000" : engine === "gemini" ? "text-white-1000" : "text-white-1000";
+                  return (
+                    <span className={`absolute right-0 text-sm font-mono font-mono ${color}`}>
+                      {label}{latency ? ` · ${latency}` : ""}
+                    </span>
+                  );
+                })()}
+              </div>
               <div className="w-full flex-1 bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-xl flex flex-col justify-center">
+                {(!chartData.data || chartData.data.length === 0) && chartData.message && (
+                  <div className="flex flex-col items-center justify-center gap-2 py-8">
+                    <p className="text-gray-300 text-sm text-center max-w-md">{chartData.message}</p>
+                  </div>
+                )}
                 {chartData.chartConfig.chartType === "pie" &&
                   renderPieOrDonut(chartData.data ?? [], false)}
                 {chartData.chartConfig.chartType === "donut" &&
@@ -1245,10 +1260,26 @@ export default function App() {
                 {chartData.chartConfig.chartType === "map" &&
                   renderMap(chartData.data ?? [])}
               </div>
-              <p className="text-gray-500 text-[10px] font-mono mt-2 text-center">
-                Source:{" "}
-                {chartData.fromCache ? "Cache Storage" : "Live Compute Engine"}
-              </p>
+              {chartData.insights && chartData.insights.length > 0 && (
+                <div className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 mt-1">
+                  <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-2">
+                    Insights
+                  </p>
+                  <ul className="space-y-1">
+                    {chartData.insights.map((insight, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-200">
+                        <span className="text-blue-400 mt-0.5 shrink-0">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {chartData.totalOrders != null && chartData.totalOrders > 0 && (
+                <p className="text-gray-500 text-[10px] font-mono mt-2 text-center">
+                  Based on {chartData.totalOrders.toLocaleString()} orders
+                </p>
+              )}
             </div>
           )}
         </div>

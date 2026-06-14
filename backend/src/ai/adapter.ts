@@ -15,21 +15,30 @@ export class AIAdapter {
       .digest('hex')
 
     const cached = this.cache.get(cacheKey)
-    if (cached) return { chartConfig: cached, fromCache: true }
+    if (cached) return { chartConfig: cached, fromCache: true, engine: "gemini" }
 
-    const chartConfig = await this.resolveWithFallback(request.nl, schemaSdl)
+    const { chartConfig, engine } = await this.resolveWithFallback(request.nl, schemaSdl)
 
     this.cache.set(cacheKey, chartConfig)
-    return { chartConfig, fromCache: false }
+    return { chartConfig, fromCache: false, engine }
   }
 
-  // Try the primary engine (Gemini). If it fails for any reason —
-  // no API key, timeout, quota, network — fall back to LocalEngine silently.
-  private async resolveWithFallback(nl: string, schemaSdl: string): Promise<ChartConfig> {
+  // Try the primary engine (Gemini) with a 5s timeout.
+  // If it fails for any reason — timeout, quota, network, bad JSON —
+  // fall back to LocalEngine silently so the user always gets a response.
+  private async resolveWithFallback(nl: string, schemaSdl: string): Promise<{ chartConfig: ChartConfig; engine: "gemini" | "local" }> {
     try {
-      return await this.engine.resolve(nl, schemaSdl)
-    } catch {
-      return await this.fallback.resolve(nl, schemaSdl)
+      const chartConfig = await Promise.race([
+        this.engine.resolve(nl, schemaSdl),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("AI timeout")), 3000)
+        ),
+      ])
+      return { chartConfig, engine: "gemini" }
+    } catch (err) {
+      console.warn("⚠️ Primary AI engine failed, falling back to LocalEngine:", (err as Error).message)
+      const chartConfig = await this.fallback.resolve(nl, schemaSdl)
+      return { chartConfig, engine: "local" }
     }
   }
 
