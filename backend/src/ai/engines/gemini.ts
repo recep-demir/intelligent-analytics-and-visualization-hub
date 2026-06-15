@@ -14,6 +14,9 @@ export class GeminiEngine implements AIEngine {
     this.model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction: SYSTEM_INSTRUCTION,
+      // Disable thinking budget — we need fast JSON, not deep reasoning.
+      // Without this, 2.5 Flash thinking can easily exceed the 5s timeout.
+      generationConfig: { thinkingConfig: { thinkingBudget: 0 } } as any,
     });
   }
 
@@ -23,10 +26,9 @@ export class GeminiEngine implements AIEngine {
     );
     const raw = result.response.text().trim();
 
-    const json = raw
-      .replace(/^```json?\n?/, "")
-      .replace(/\n?```$/, "")
-      .trim();
+    // Extract JSON — handle plain JSON, ```json fences, or prose before the fence
+    const fenceMatch = raw.match(/```json?\n?([\s\S]*?)\n?```/);
+    const json = (fenceMatch ? fenceMatch[1] : raw).trim();
 
     try {
       console.log({ json });
