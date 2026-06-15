@@ -47,15 +47,17 @@ function formatVal(v: number, aggregation?: string): string {
   return `$${Number(v).toFixed(2)}`;
 }
 
-function VerticalLegend({ minV, maxV, agg }: { minV: number; maxV: number; agg?: string }) {
+function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number; agg?: string; label: string }) {
   return (
     <div className="flex flex-col items-center justify-between py-2 w-20 shrink-0">
+      <span className="text-xs text-gray-400 text-center mb-1 uppercase tracking-wider leading-tight">{label}</span>
       <span className="text-sm font-bold text-white text-center leading-tight">{formatVal(maxV, agg)}</span>
       <div
         className="flex-1 w-5 rounded-full my-3"
         style={{ background: "linear-gradient(to bottom, #ef4444, #8b5cf6, #3b82f6)", minHeight: "200px" }}
       />
       <span className="text-sm font-bold text-white text-center leading-tight">{formatVal(minV, agg)}</span>
+      <span className="text-xs text-gray-500 text-center mt-1 leading-tight">← low</span>
     </div>
   );
 }
@@ -63,9 +65,10 @@ function VerticalLegend({ minV, maxV, agg }: { minV: number; maxV: number; agg?:
 interface Props {
   data: { name: string; value: number }[];
   aggregation?: string;
+  legend?: string;
 }
 
-export function CanadaMap({ data, aggregation }: Props) {
+export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   const lookup: Record<string, number> = {};
@@ -197,7 +200,7 @@ export function CanadaMap({ data, aggregation }: Props) {
           )}
         </div>
 
-        <VerticalLegend minV={minV} maxV={maxV} agg={aggregation} />
+        <VerticalLegend minV={minV} maxV={maxV} agg={aggregation} label={legend} />
       </div>
     </div>
   );

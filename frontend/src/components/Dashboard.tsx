@@ -23,7 +23,9 @@ ChartJS.register(
   PointElement, Title, Tooltip, Legend, Filler,
 );
 
-function baseChartOptions(title: string) {
+const AXIS_TITLE_STYLE = { display: true, color: "#64748b", font: { size: 11 } };
+
+function baseChartOptions(title: string, xLabel = "", yLabel = "") {
   return {
     responsive: true,
     plugins: {
@@ -31,14 +33,22 @@ function baseChartOptions(title: string) {
       title: { display: true, text: title, color: "#e2e8f0", font: { size: 14 } },
     },
     scales: {
-      x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-      y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
+      x: {
+        ticks: { color: "#94a3b8" },
+        grid:  { color: "#1e293b" },
+        title: { ...AXIS_TITLE_STYLE, text: xLabel },
+      },
+      y: {
+        ticks: { color: "#94a3b8" },
+        grid:  { color: "#1e293b" },
+        title: { ...AXIS_TITLE_STYLE, text: yLabel },
+      },
     },
   };
 }
 
-function horizontalBarOptions(title: string) {
-  return { ...baseChartOptions(title), indexAxis: "y" as const };
+function horizontalBarOptions(title: string, xLabel = "", yLabel = "") {
+  return { ...baseChartOptions(title, xLabel, yLabel), indexAxis: "y" as const };
 }
 
 function computeKpis(stats: ReturnType<typeof useDashboardStats>["data"]): KpiData {
@@ -244,39 +254,39 @@ export function Dashboard() {
       {/* Province Map */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
         <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
-        <CanadaMap data={mapData} aggregation="count" />
+        <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
       </div>
 
       {/* Row 1: Line + Order Status Bar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
           <div className="relative w-full h-64">
-            <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle), maintainAspectRatio: false }} />
+            <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={ordersByStatusChart} options={baseChartOptions("Order Volume by Status")} />
+          <Bar data={ordersByStatusChart} options={baseChartOptions("Order Volume by Status", "Order Status", "Count")} />
         </div>
       </div>
 
       {/* Row 2: Horizontal bars */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProductGroupsChart} options={horizontalBarOptions("Top 8 Product Groups by Revenue")} />
+          <Bar data={topProductGroupsChart} options={horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group")} />
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProvincesChart} options={horizontalBarOptions("Top 8 Provinces by Orders")} />
+          <Bar data={topProvincesChart} options={horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province")} />
         </div>
       </div>
 
       {/* Row 3: Tax & Sales Contribution by Product Category */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category")} />
+        <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category", "Revenue", "Category")} />
       </div>
 
       {/* Row 4: Top 5 Lowest-Performing Products */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={bottomProductsChart} options={horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue")} />
+        <Bar data={bottomProductsChart} options={horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue", "Revenue", "Product")} />
       </div>
     </div>
   );
