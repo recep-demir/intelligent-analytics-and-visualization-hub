@@ -3,6 +3,8 @@ import type { DashboardStats } from "../types/dashboard";
 
 export interface DashboardFilters {
   year?:     number | null;
+  yearFrom?: number | null;
+  yearTo?:   number | null;
   province?: string | null;
   status?:   string | null;
   category?: string | null;
@@ -18,6 +20,8 @@ function buildQuery(filters: DashboardFilters): string {
   const args: string[] = [];
 
   if (filters.year)     args.push(`year: ${filters.year}`);
+  if (filters.yearFrom) args.push(`yearFrom: ${filters.yearFrom}`);
+  if (filters.yearTo)   args.push(`yearTo: ${filters.yearTo}`);
   if (filters.province) args.push(`province: "${filters.province}"`);
   if (filters.status)   args.push(`status: "${filters.status}"`);
   if (filters.category) args.push(`category: "${filters.category}"`);
@@ -85,7 +89,7 @@ export function useDashboardStats(filters: DashboardFilters = {}): UseDashboardS
 
     fetchStats();
     return () => controller.abort();
-  }, [filters.year, filters.province, filters.status, filters.category]);
+  }, [filters.year, filters.yearFrom, filters.yearTo, filters.province, filters.status, filters.category]);
 
   return { data, loading, error };
 }

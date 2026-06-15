@@ -18,3 +18,32 @@ export interface KpiData {
   avgOrderValue:   number;
   conversionRate:  number;
 }
+
+export interface LineDataset {
+  label: string;
+  data: number[];
+  borderColor: string;
+  backgroundColor: string;
+  fill: boolean;
+  tension: number;
+  pointRadius: number;
+}
+
+export interface BarDataset {
+  label: string;
+  data: number[];
+  backgroundColor: string | string[];
+  borderRadius?: number;
+}
+
+export interface DoughnutDataset {
+  data: number[];
+  backgroundColor: string[];
+  borderWidth: number;
+  borderColor: string;
+}
+
+export interface ChartDataShape<T> {
+  labels: string[];
+  datasets: T[];
+}

@@ -18,6 +18,8 @@ export const dashboardTypeDefs = `#graphql
   extend type Query {
     dashboardStats(
       year: Int
+      yearFrom: Int
+      yearTo: Int
       province: String
       status: String
       category: String
@@ -27,6 +29,8 @@ export const dashboardTypeDefs = `#graphql
 
 interface DashboardStatsArgs {
   year?: number | null;
+  yearFrom?: number | null;
+  yearTo?: number | null;
   province?: string | null;
   status?: string | null;
   category?: string | null;
@@ -45,9 +49,9 @@ function hasYear(value?: number | null): value is number {
 function buildReplacements(args: DashboardStatsArgs): SqlReplacements {
   const replacements: SqlReplacements = {};
 
-  if (hasYear(args.year)) {
-    replacements.year = args.year;
-  }
+  if (hasYear(args.year))     replacements.year     = args.year;
+  if (hasYear(args.yearFrom)) replacements.yearFrom = args.yearFrom;
+  if (hasYear(args.yearTo))   replacements.yearTo   = args.yearTo;
 
   if (hasText(args.province)) {
     replacements.province = args.province.trim();
@@ -84,6 +88,9 @@ function buildOrderLevelWhere(
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
+  } else if (hasYear(args.yearFrom) || hasYear(args.yearTo)) {
+    if (hasYear(args.yearFrom)) conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) >= :yearFrom");
+    if (hasYear(args.yearTo))   conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) <= :yearTo");
   } else if (options.useMonthlyRevenueDefaults) {
     conditions.push("o.createdAt >= '2023-01-01'");
   }
@@ -113,7 +120,7 @@ function buildOrderLevelWhere(
 }
 
 function needsOrderJoin(args: DashboardStatsArgs): boolean {
-  return hasYear(args.year) || hasText(args.status) || hasText(args.province);
+  return hasYear(args.year) || hasYear(args.yearFrom) || hasYear(args.yearTo) || hasText(args.status) || hasText(args.province);
 }
 
 function buildItemOrderJoins(args: DashboardStatsArgs): string {
@@ -134,6 +141,9 @@ function buildItemConditions(args: DashboardStatsArgs): string[] {
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
+  } else if (hasYear(args.yearFrom) || hasYear(args.yearTo)) {
+    if (hasYear(args.yearFrom)) conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) >= :yearFrom");
+    if (hasYear(args.yearTo))   conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) <= :yearTo");
   }
 
   if (hasText(args.province)) {
