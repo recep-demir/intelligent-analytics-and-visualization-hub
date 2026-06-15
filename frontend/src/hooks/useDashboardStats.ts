@@ -67,7 +67,14 @@ export function useDashboardStats(filters: DashboardFilters = {}): UseDashboardS
           throw new Error(json.errors[0].message);
         }
 
-        setData(json.data.dashboardStats as DashboardStats);
+        const stats = json.data?.dashboardStats;
+        const REQUIRED_FIELDS = ["monthlyRevenue", "ordersByStatus", "topProductGroups", "topProvinces", "categoryRevenue"] as const;
+        const missing = REQUIRED_FIELDS.filter(f => !Array.isArray(stats?.[f]));
+        if (missing.length) {
+          throw new Error(`Incomplete response from server: missing ${missing.join(", ")}`);
+        }
+
+        setData(stats as DashboardStats);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");

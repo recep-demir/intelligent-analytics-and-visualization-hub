@@ -17,18 +17,12 @@ import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
 import type { KpiData } from "../types/dashboard";
+import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
   PointElement, ArcElement, Title, Tooltip, Legend, Filler,
 );
-
-const CHART_COLORS = [
-  "#3b82f6", "#10b981", "#6366f1", "#f59e0b",
-  "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6",
-];
-
-const DOUGHNUT_COLORS = ["#3b82f6", "#10b981", "#6366f1", "#f59e0b", "#ef4444"];
 
 function baseChartOptions(title: string) {
   return {
@@ -116,10 +110,14 @@ export function Dashboard() {
 
   const kpis = computeKpis(data);
 
+  const revenueChartTitle = filters.year
+    ? `Monthly Revenue (${filters.year})`
+    : "Monthly Revenue (All Years)";
+
   const monthlyRevenueChart = {
     labels: data.monthlyRevenue.map((r) => r.month),
     datasets: [{
-      label: "Revenue ()",
+      label: "Revenue",
       data:  data.monthlyRevenue.map((r) => r.revenue),
       borderColor:     "#3b82f6",
       backgroundColor: "rgba(59,130,246,0.15)",
@@ -227,7 +225,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
           <div className="relative w-full h-64">
-            <Line data={monthlyRevenueChart} options={{ ...baseChartOptions("Monthly Revenue (2023)"), maintainAspectRatio: false }} />
+            <Line data={monthlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
