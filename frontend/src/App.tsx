@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { Dashboard } from "./components/Dashboard";
+import { AdminPanel } from "./components/AdminPanel";
 import "./index.css";
 
 const CANADA_GEO = "/canada-provinces.json";
@@ -595,11 +596,17 @@ export default function App() {
     </div>
   );
 
+    const navItems = [...NAV_ITEMS];
+  if (userRole === "admin") {
+    navItems.push({ id: "admin", label: "Admin Panel", path: "/admin" });
+  }
+
   return (
-    <DashboardLayout navItems={NAV_ITEMS}>
+    <DashboardLayout navItems={navItems}>
       <Routes>
         <Route path="/"          element={nlAssistantPage} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin"     element={<AdminPanel />} />
       </Routes>
     </DashboardLayout>
   );
