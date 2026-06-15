@@ -72,8 +72,8 @@ function computeKpis(stats: ReturnType<typeof useDashboardStats>["data"]): KpiDa
 
 function formatCurrency(value: number): string {
   return value >= 1000
-    ? `CA$${(value / 1000).toFixed(1)}K`
-    : `CA$${value.toFixed(0)}`;
+    ? `${(value / 1000).toFixed(1)}K`
+    : `${value.toFixed(0)}`;
 }
 
 const YEARS     = [2022, 2023, 2024, 2025];
@@ -119,7 +119,7 @@ export function Dashboard() {
   const monthlyRevenueChart = {
     labels: data.monthlyRevenue.map((r) => r.month),
     datasets: [{
-      label: "Revenue (CA$)",
+      label: "Revenue ()",
       data:  data.monthlyRevenue.map((r) => r.revenue),
       borderColor:     "#3b82f6",
       backgroundColor: "rgba(59,130,246,0.15)",
@@ -142,7 +142,7 @@ export function Dashboard() {
   const topProductGroupsChart = {
     labels: data.topProductGroups.map((g) => g.name),
     datasets: [{
-      label: "Revenue (CA$)",
+      label: "Revenue ()",
       data:  data.topProductGroups.map((g) => g.revenue),
       backgroundColor: CHART_COLORS,
       borderRadius:    4,
@@ -162,7 +162,7 @@ export function Dashboard() {
   const categoryRevenueChart = {
     labels: data.categoryRevenue.map((c) => c.category),
     datasets: [{
-      label: "Revenue (CA$)",
+      label: "Revenue ()",
       data:  data.categoryRevenue.map((c) => c.revenue),
       backgroundColor: [CHART_COLORS[0], CHART_COLORS[1]],
       borderRadius:    6,
