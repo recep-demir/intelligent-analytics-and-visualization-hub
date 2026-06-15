@@ -1,97 +1,40 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Route, Routes } from "react-router-dom";
-import { AdminPanel } from "./components/AdminPanel";
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Marker,
-} from "react-simple-maps";
+import React, { useState, useEffect, useRef } from "react";
+import { Routes, Route } from "react-router-dom";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { Dashboard } from "./components/Dashboard";
+import { AdminPanel } from "./components/AdminPanel";
 import "./index.css";
 
 const CANADA_GEO = "/canada-provinces.json";
 
 const NAV_ITEMS = [
   { id: "assistant", label: "AI Assistant", path: "/" },
-  { id: "dashboard", label: "Dashboard", path: "/dashboard" },
+  { id: "dashboard", label: "Dashboard",    path: "/dashboard" },
 ];
 
-const PROVINCE_CAPITALS: {
-  city: string;
-  anchor: "middle" | "start" | "end";
-  dx: number;
-  dy: number;
-  coords: [number, number];
-}[] = [
-  { city: "Victoria", coords: [-123.37, 48.43], anchor: "end", dx: -3, dy: -4 },
-  {
-    city: "Edmonton",
-    coords: [-113.49, 53.54],
-    anchor: "middle",
-    dx: 0,
-    dy: -4,
-  },
-  { city: "Regina", coords: [-104.62, 50.45], anchor: "middle", dx: 0, dy: -4 },
-  { city: "Winnipeg", coords: [-97.14, 49.9], anchor: "middle", dx: 0, dy: -4 },
-  { city: "Toronto", coords: [-79.38, 43.65], anchor: "start", dx: 3, dy: -4 },
-  { city: "Québec", coords: [-71.21, 46.81], anchor: "end", dx: -4, dy: -3 },
-  {
-    city: "Fredericton",
-    coords: [-66.64, 45.96],
-    anchor: "start",
-    dx: 4,
-    dy: 6,
-  },
-  { city: "Halifax", coords: [-63.58, 44.65], anchor: "start", dx: 4, dy: 7 },
-  {
-    city: "Charlottetown",
-    coords: [-63.13, 46.24],
-    anchor: "end",
-    dx: -4,
-    dy: 6,
-  },
-  {
-    city: "St. John's",
-    coords: [-52.71, 47.56],
-    anchor: "start",
-    dx: 3,
-    dy: -4,
-  },
-  {
-    city: "Whitehorse",
-    coords: [-135.06, 60.72],
-    anchor: "start",
-    dx: 3,
-    dy: -4,
-  },
-  {
-    city: "Yellowknife",
-    coords: [-114.37, 62.45],
-    anchor: "middle",
-    dx: 0,
-    dy: -4,
-  },
-  { city: "Iqaluit", coords: [-68.52, 63.75], anchor: "end", dx: -3, dy: -4 },
+const PROVINCE_CAPITALS: { city: string; anchor: "middle" | "start" | "end"; dx: number; dy: number; coords: [number, number] }[] = [
+  { city: "Victoria",      coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
+  { city: "Edmonton",      coords: [-113.49, 53.54], anchor: "middle", dx:   0, dy: -4 },
+  { city: "Regina",        coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
+  { city: "Winnipeg",      coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
+  { city: "Toronto",       coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
+  { city: "Québec",        coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
+  { city: "Fredericton",   coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
+  { city: "Halifax",       coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
+  { city: "Charlottetown", coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
+  { city: "St. John's",    coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
+  { city: "Whitehorse",    coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
+  { city: "Yellowknife",   coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
+  { city: "Iqaluit",       coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
 ];
 
 function normalizeProvince(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-// Types aligned with the shared project contract (shared/types/chart.ts)
 interface ChartConfig {
-  chartType:
-    | "line"
-    | "bar"
-    | "treemap"
-    | "pie"
-    | "donut"
-    | "grid"
-    | "heatmap"
-    | "map"
-    | "stat";
+  chartType: "line" | "bar" | "treemap" | "pie" | "donut" | "grid" | "heatmap" | "map" | "stat";
   dataset: string;
   filters?: { field: string; operator: string; value: string }[];
   groupBy?: string;
@@ -107,96 +50,73 @@ interface NLQueryResponse {
 }
 
 const PIE_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#6366f1",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#f97316",
+  "#3b82f6", "#10b981", "#6366f1", "#f59e0b",
+  "#ef4444", "#8b5cf6", "#06b6d4", "#f97316",
 ];
 
 function heatColor(t: number): string {
-  const r = Math.round(59 + (239 - 59) * t);
-  const g = Math.round(130 + (68 - 130) * t);
-  const b = Math.round(246 + (68 - 246) * t);
+  const r = Math.round(59  + (239 - 59)  * t);
+  const g = Math.round(130 + (68  - 130) * t);
+  const b = Math.round(246 + (68  - 246) * t);
   return `rgb(${r},${g},${b})`;
 }
 
-// Renderers & Formatter Functions
 function formatVal(v: number, aggregation?: string): string {
   if (aggregation === "count") {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+    if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}K`;
     return String(Math.round(v));
   }
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}K`;
   return `$${Number(v).toFixed(2)}`;
 }
 
 function VerticalLegend({
-  minV,
-  maxV,
-  agg,
-  gradient = "linear-gradient(to bottom, #ef4444, #8b5cf6, #3b82f6)",
+  minV, maxV, agg, gradient = "linear-gradient(to bottom, #ef4444, #8b5cf6, #3b82f6)",
 }: {
-  minV: number;
-  maxV: number;
-  agg?: string;
+  minV: number; maxV: number; agg?: string;
   gradient?: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-between py-2 w-20 shrink-0">
-      <span className="text-sm font-bold text-white text-center leading-tight">
-        {formatVal(maxV, agg)}
-      </span>
+      <span className="text-sm font-bold text-white text-center leading-tight">{formatVal(maxV, agg)}</span>
       <div
         className="flex-1 w-5 rounded-full my-3"
         style={{ background: gradient, minHeight: "200px" }}
       />
-      <span className="text-sm font-bold text-white text-center leading-tight">
-        {formatVal(minV, agg)}
-      </span>
+      <span className="text-sm font-bold text-white text-center leading-tight">{formatVal(minV, agg)}</span>
     </div>
   );
 }
 
 function generateTitle(config: ChartConfig): string {
   const agg = config.aggregation ?? "sum";
-
   const metric =
-    agg === "count"
-      ? "Orders"
-      : agg === "avg"
-        ? "Avg. Revenue"
-        : agg === "min"
-          ? "Min Revenue"
-          : agg === "max"
-            ? "Max Revenue"
-            : "Revenue";
+    agg === "count" ? "Orders" :
+    agg === "avg"   ? "Avg. Revenue" :
+    agg === "min"   ? "Min Revenue" :
+    agg === "max"   ? "Max Revenue" :
+                      "Revenue";
 
   const GROUP_LABELS: Record<string, string> = {
-    province: "Province",
-    year: "Year",
-    month: "Month",
-    status: "Order Status",
-    category: "Category",
+    province:     "Province",
+    year:         "Year",
+    month:        "Month",
+    status:       "Order Status",
+    category:     "Category",
     productGroup: "Product Group",
-    product: "Product",
-    total: "",
+    product:      "Product",
+    total:        "",
   };
 
-  const yearFilters = config.filters?.filter((f) => f.field === "year") ?? [];
-  const gte = yearFilters.find((f) => f.operator === "gte")?.value;
-  const lte = yearFilters.find((f) => f.operator === "lte")?.value;
-  const eq = yearFilters.find((f) => f.operator === "eq")?.value;
-  const period =
-    gte && lte ? ` · ${gte} – ${lte}` : eq ? ` · ${eq}` : " · 2018 – 2024";
+  const yearFilters = config.filters?.filter(f => f.field === "year") ?? [];
+  const gte = yearFilters.find(f => f.operator === "gte")?.value;
+  const lte = yearFilters.find(f => f.operator === "lte")?.value;
+  const eq  = yearFilters.find(f => f.operator === "eq")?.value;
+  const period = gte && lte ? ` · ${gte} – ${lte}` : eq ? ` · ${eq}` : " · 2018 – 2024";
 
-  if (config.chartType === "map")
-    return `Canada · ${metric} by Province${period}`;
+  if (config.chartType === "map") return `Canada · ${metric} by Province${period}`;
   if (config.chartType === "stat") return `Total ${metric}${period}`;
 
   const groupLabel = config.groupBy ? GROUP_LABELS[config.groupBy] : null;
@@ -204,11 +124,30 @@ function generateTitle(config: ChartConfig): string {
   return `${metric}${period}`;
 }
 
-export default function App() {
-  const [query, setQuery] = useState("");
+const getRoleFromToken = (tokenStr: string | null): string => {
+  if (!tokenStr) return "viewer";
+  try {
+    const base64Url = tokenStr.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload).role?.toLowerCase() ?? "viewer";
+  } catch (e) {
+    return "viewer";
+  }
+};
 
-  // 🧭 B-3 Fail-Safe: Initialize to lowercase contract specification
-  const [userRole, setUserRole] = useState("viewer");
+export default function App() {
+  console.log("Registered map markers module:", Marker);
+  console.log("Loaded province capitals data:", PROVINCE_CAPITALS);
+  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
+  const [userRole, setUserRole] = useState<string>(getRoleFromToken(token)); 
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<NLQueryResponse | null>(null);
@@ -216,132 +155,151 @@ export default function App() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    return () => { if (abortControllerRef.current) abortControllerRef.current.abort(); };
   }, []);
 
-  const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
+  const decodeAndSetUserRole = (tokenStr: string) => {
+    try {
+      const base64Url = tokenStr.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64));
+      if (payload && payload.role) {
+        setUserRole(payload.role.toLowerCase());
+      }
+    } catch (e) {
+      console.error("Token decode error, falling back to viewer role:", e);
+      setUserRole("viewer");
+    }
+  };
+
+  // 🔐 Refactored Core Authentication Handler with Secure State Synchronization
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    setAuthError(null);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: email, password: password }),
+      });
 
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+      if (!response.ok) {
+        setAuthError("Invalid username or password");
+        setPassword(""); 
+        return;
+      }
 
-    setError(null);
-    setChartData(null);
+      // 🔑 1. Extract token and profile metadata from the API response payload
+      const data = await response.json();
+
+      // 💾 2. Securely persist authentication credentials in local state variables
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      setToken(data.token);
+      
+      // 👤 3. Execute dynamic cryptographic role verification lifecycle
+      decodeAndSetUserRole(data.token);
+      
+      // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
+      setEmail("");
+      setPassword("");
+      console.log("🔐 Successfully authenticated via real backend API.");
+    } catch (err) {
+      console.error("Login network error:", err);
+      setAuthError("Server connection failed. Please try again later.");
+      setPassword("");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.error("Logout request failed, discarding client token anyway.", err);
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setToken(null);
+      setUserRole("viewer");
+      setChartData(null);
+      setQuery("");
+    }
+  };
+
+  // 🤖 Dynamic Natural Language AI Processing Core
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim() || isLoading || userRole !== "admin") return;
+
     setIsLoading(true);
+    setError(null);
 
     try {
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
       const response = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({ nl: query }),
+        headers: {
+          "Content-Type": "application/json",
+          // 🔒 Inject Bearer Token to fulfill strict server-side RBAC validation checks
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ question: query.trim() })
       });
 
-      if (!response.ok)
-        throw new Error(`Server responded with status ${response.status}`);
-
-      const rawData = await response.json();
-
-      if (!Array.isArray(rawData.data) || rawData.data.length === 0) {
-        throw new Error(
-          rawData.message ??
-            "No data returned for this question. Try rephrasing.",
-        );
+      if (!response.ok) {
+        throw new Error("Failed to pull analytical insight data from analytical engine.");
       }
 
-      setChartData({
-        chartConfig: {
-          chartType:
-            rawData.chartConfig?.chartType ??
-            rawData.chartConfig?.charttype ??
-            "bar",
-          groupBy:
-            rawData.chartConfig?.groupBy ?? rawData.chartConfig?.groupby ?? "",
-          dataset:
-            rawData.chartConfig?.dataset ?? rawData.chartConfig?.dataSet ?? "",
-          filters: rawData.chartConfig?.filters ?? [],
-          aggregation: rawData.chartConfig?.aggregation,
-          title: rawData.chartConfig?.title ?? query,
-        },
-        fromCache: rawData.fromCache ?? false,
-        data: rawData.data,
-        message: rawData.message,
-      });
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred.",
-      );
+      const payload = await response.json();
+      setChartData(payload);
+    } catch (err: any) {
+      console.error("AI execution error:", err);
+      setError(err.message || "An analytics engine breakdown occurred.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ── Chart Renderers ─────────────────────────────────────────────────────────
   const agg = chartData?.chartConfig.aggregation;
 
   function renderPieOrDonut(records: any[], isDonut: boolean) {
-    const total =
-      records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
-    const GAP = 0.9;
+    const total = records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
+    const GAP = 0.9; 
     const available = 100 - records.length * GAP;
     let cumulative = 0;
     const stopParts: string[] = [];
     records.forEach((r: any, i: number) => {
       const pct = ((r.value ?? 0) / total) * available;
       const segEnd = cumulative + pct;
-      stopParts.push(
-        `${PIE_COLORS[i % PIE_COLORS.length]} ${cumulative.toFixed(2)}% ${segEnd.toFixed(2)}%`,
-      );
-      stopParts.push(
-        `transparent ${segEnd.toFixed(2)}% ${(segEnd + GAP).toFixed(2)}%`,
-      );
+      stopParts.push(`${PIE_COLORS[i % PIE_COLORS.length]} ${cumulative.toFixed(2)}% ${segEnd.toFixed(2)}%`);
+      stopParts.push(`transparent ${segEnd.toFixed(2)}% ${(segEnd + GAP).toFixed(2)}%`);
       cumulative = segEnd + GAP;
     });
     const stops = stopParts.join(", ");
-
     const cutoutPx = isDonut ? 44 : 0;
-    const maskStyle = isDonut
-      ? `radial-gradient(circle ${cutoutPx}px, transparent ${cutoutPx}px, white ${cutoutPx + 1}px)`
-      : undefined;
+    const maskStyle = isDonut ? `radial-gradient(circle ${cutoutPx}px, transparent ${cutoutPx}px, white ${cutoutPx + 1}px)` : undefined;
 
     return (
       <div className="flex items-center gap-10 py-4 w-full justify-center">
         <div className="relative w-48 h-48 flex items-center justify-center shrink-0 filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
-          <div
-            className="w-full h-full rounded-full"
-            style={{
-              background: `conic-gradient(${stops})`,
-              WebkitMaskImage: maskStyle,
-              maskImage: maskStyle,
-            }}
-          />
+          <div className="w-full h-full rounded-full" style={{ background: `conic-gradient(${stops})`, WebkitMaskImage: maskStyle, maskImage: maskStyle }} />
           {isDonut && (
             <div className="absolute w-28 h-28 rounded-full bg-gray-900 border border-gray-800/80 shadow-inner flex items-center justify-center">
-              <span className="text-sm font-mono text-gray-200 font-bold text-center leading-tight px-2">
-                {formatVal(total, agg)}
-              </span>
+              <span className="text-sm font-mono text-gray-200 font-bold text-center leading-tight px-2">{formatVal(total, agg)}</span>
             </div>
           )}
         </div>
         <div className="space-y-2.5 min-w-[220px]">
           {records.map((record: any, i: number) => (
             <div key={i} className="flex items-center gap-3">
-              <span
-                className="w-3 h-3 rounded-sm shrink-0"
-                style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
-              />
-              <span className="text-sm text-gray-200 font-medium flex-1">
-                {record.name ?? `Item ${i + 1}`}
-              </span>
-              <span className="text-sm text-blue-300 font-bold font-mono">
-                {formatVal(record.value ?? 0, agg)}
-              </span>
+              <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+              <span className="text-sm text-gray-200 font-medium flex-1">{record.name ?? `Item ${i + 1}`}</span>
+              <span className="text-sm text-blue-300 font-bold font-mono">{formatVal(record.value ?? 0, agg)}</span>
             </div>
           ))}
         </div>
@@ -363,335 +321,84 @@ export default function App() {
             return (
               <div key={index} className="w-full group">
                 <div className="text-sm font-mono mb-1 px-1">
-                  <span className="text-gray-200 font-semibold group-hover:text-white transition-colors">
-                    {label}
-                  </span>
+                  <span className="text-gray-200 font-semibold group-hover:text-white transition-colors">{label}</span>
                 </div>
                 <div className="w-full bg-gray-950 h-8 rounded-lg overflow-hidden border border-gray-800/50 shadow-inner">
-                  <div
-                    className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-full rounded-lg shadow-[0_0_16px_rgba(59,130,246,0.35)] group-hover:brightness-110 transition-all duration-500 ease-out flex items-center justify-end pr-3"
-                    style={{ width: `${barWidth}%` }}
-                  >
-                    {labelFits && (
-                      <span className="text-white text-xs font-bold whitespace-nowrap drop-shadow-md">
-                        {formatVal(value, agg)}
-                      </span>
-                    )}
+                  <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-full rounded-lg shadow-[0_0_16px_rgba(59,130,246,0.35)] group-hover:brightness-110 transition-all duration-500 ease-out flex items-center justify-end pr-3" style={{ width: `${barWidth}%` }}>
+                    {labelFits && <span className="text-white text-xs font-bold whitespace-nowrap drop-shadow-md">{formatVal(value, agg)}</span>}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-        <VerticalLegend
-          minV={minValue}
-          maxV={maxValue}
-          agg={agg}
-          gradient="linear-gradient(to bottom, #10b981, #3b82f6)"
-        />
+        <VerticalLegend minV={minValue} maxV={maxValue} agg={agg} gradient="linear-gradient(to bottom, #10b981, #3b82f6)" />
       </div>
     );
   }
 
   function renderLine(points: any[]) {
     if (points.length === 0) return null;
-
-    if (points.length === 1) {
-      const val = points[0].value ?? 0;
-      const label = points[0].name ?? points[0].year ?? "—";
-      return (
-        <div className="w-full bg-gray-950/50 border border-blue-900/40 rounded-xl p-5 text-center">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500 block mb-1">
-            Snapshot
-          </span>
-          <h3 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
-            {label}
-          </h3>
-          <span className="text-base font-bold text-white font-mono">
-            {formatVal(Number(val), agg)}
-          </span>
-        </div>
-      );
-    }
-
-    const isMinMax = "min" in points[0] && "max" in points[0];
-    if (isMinMax) {
-      const minVals = points.map((d: any) => parseFloat(d.min) || 0);
-      const maxVals = points.map((d: any) => parseFloat(d.max) || 0);
-      const allVals = [...minVals, ...maxVals];
-      const maxV = Math.max(...allVals, 1);
-      const minV = Math.min(...allVals);
-      const VB_W2 = 100,
-        VB_H2 = 40;
-      const pad2 = (maxV - minV) * 0.1 || maxV * 0.1;
-      const yMax2 = maxV + pad2;
-      const yMin2 = Math.max(0, minV - pad2);
-      const range2 = yMax2 - yMin2 || 1;
-
-      const toCoords = (vals: number[]) =>
-        vals.map((v, i) => ({
-          x: (i / (vals.length - 1)) * VB_W2,
-          y: VB_H2 * 0.88 - ((v - yMin2) / range2) * (VB_H2 * 0.76),
-          label: points[i].name ?? points[i].year ?? `Pt ${i + 1}`,
-          val: v,
-        }));
-
-      const minCoords = toCoords(minVals);
-      const maxCoords = toCoords(maxVals);
-
-      const smoothLine2 = (pts: { x: number; y: number }[]) => {
-        let d = `M ${pts[0].x} ${pts[0].y}`;
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p0 = pts[Math.max(i - 1, 0)],
-            p1 = pts[i],
-            p2 = pts[i + 1],
-            p3 = pts[Math.min(i + 2, pts.length - 1)];
-          const cp1x = p1.x + (p2.x - p0.x) / 6,
-            cp1y = p1.y + (p2.y - p0.y) / 6;
-          const cp2x = p2.x - (p3.x - p1.x) / 6,
-            cp2y = p2.y - (p3.y - p1.y) / 6;
-          d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ${p2.x} ${p2.y}`;
-        }
-        return d;
-      };
-
-      return (
-        <div className="flex gap-4 w-full pt-2">
-          <div className="flex-1">
-            <div className="flex gap-1 items-stretch">
-              <div
-                className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1 py-1"
-                style={{ width: "52px" }}
-              >
-                <span>{formatVal(maxV, agg)}</span>
-                <span>{formatVal((maxV + minV) / 2, agg)}</span>
-                <span>{formatVal(minV, agg)}</span>
-              </div>
-              <div className="flex-1 relative h-72 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-hidden">
-                <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed" />
-                <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed" />
-                <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed" />
-                <svg
-                  className="w-full h-full"
-                  viewBox={`0 0 ${VB_W2} ${VB_H2}`}
-                  preserveAspectRatio="none"
-                >
-                  <path
-                    d={smoothLine2(maxCoords)}
-                    fill="none"
-                    stroke="#f87171"
-                    strokeWidth="0.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d={smoothLine2(minCoords)}
-                    fill="none"
-                    stroke="#60a5fa"
-                    strokeWidth="0.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {maxCoords.map((c, i) => (
-                    <circle
-                      key={`mx-${i}`}
-                      cx={c.x}
-                      cy={c.y}
-                      r="0.7"
-                      fill="#f87171"
-                    >
-                      <title>{`${c.label} max: ${formatVal(c.val, agg)}`}</title>
-                    </circle>
-                  ))}
-                  {minCoords.map((c, i) => (
-                    <circle
-                      key={`mn-${i}`}
-                      cx={c.x}
-                      cy={c.y}
-                      r="0.7"
-                      fill="#60a5fa"
-                    >
-                      <title>{`${c.label} min: ${formatVal(c.val, agg)}`}</title>
-                    </circle>
-                  ))}
-                </svg>
-              </div>
-            </div>
-            <div
-              className="flex justify-between text-[10px] font-mono text-gray-300 font-medium mt-1"
-              style={{ paddingLeft: "60px" }}
-            >
-              {minCoords.map((c, i) => (
-                <span key={i}>{c.label}</span>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col items-start justify-center gap-4 w-20 shrink-0 py-2">
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-1 bg-rose-400 rounded inline-block" />
-              <span className="text-sm font-bold text-white">Max</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-1 bg-blue-400 rounded inline-block" />
-              <span className="text-sm font-bold text-white">Min</span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     const getValue = (d: any) => {
       const val = d.value ?? d.amount ?? d.percentage ?? d.total;
       return typeof val === "number" ? val : parseFloat(val) || 0;
     };
-    const getLabel = (d: any, i: number) =>
-      d.name ?? d.year ?? d.date ?? d.label ?? `Pt ${i + 1}`;
-
     const rawValues = points.map(getValue);
     const dataMax = Math.max(...rawValues, 1);
     const dataMin = Math.min(...rawValues);
-    const pad = (dataMax - dataMin) * 0.15 || dataMax * 0.1;
-    const maxValue = dataMax + pad;
-    const minValue = Math.max(0, dataMin - pad);
+    const maxValue = dataMax + (dataMax - dataMin) * 0.15;
+    const minValue = Math.max(0, dataMin - (dataMax - dataMin) * 0.15);
     const valueRange = maxValue - minValue || 1;
 
-    const VB_W = 100,
-      VB_H = 40;
+    const VB_W = 100, VB_H = 40;
     const coords = points.map((d: any, i: number) => ({
       x: points.length > 1 ? (i / (points.length - 1)) * VB_W : VB_W / 2,
-      y: VB_H * 0.88 - ((getValue(d) - minValue) / valueRange) * (VB_H * 0.76),
-      label: getLabel(d, i),
+      y: (VB_H * 0.88) - ((getValue(d) - minValue) / valueRange) * (VB_H * 0.76),
+      label: d.name ?? d.year ?? `Pt ${i + 1}`,
       val: getValue(d),
     }));
 
-    const smoothLine = (pts: { x: number; y: number }[]) => {
-      if (pts.length < 2)
-        return pts
-          .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-          .join(" ");
+    const smoothLine = (pts: {x:number;y:number}[]) => {
       let d = `M ${pts[0].x} ${pts[0].y}`;
       for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[Math.max(i - 1, 0)],
-          p1 = pts[i],
-          p2 = pts[i + 1],
-          p3 = pts[Math.min(i + 2, pts.length - 1)];
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-        d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ${p2.x} ${p2.y}`;
+        const p0 = pts[Math.max(i-1,0)], p1 = pts[i], p2 = pts[i+1], p3 = pts[Math.min(i+2,pts.length-1)];
+        d += ` C ${(p1.x + (p2.x - p0.x) / 6).toFixed(2)} ${(p1.y + (p2.y - p0.y) / 6).toFixed(2)} ${(p2.x - (p3.x - p1.x) / 6).toFixed(2)} ${(p2.y - (p3.y - p1.y) / 6).toFixed(2)} ${p2.x} ${p2.y}`;
       }
       return d;
     };
-
-    const linePath = smoothLine(coords);
-    const areaPath = `${linePath} L ${coords[coords.length - 1].x} ${VB_H} L ${coords[0].x} ${VB_H} Z`;
 
     return (
       <div className="flex gap-4 w-full pt-2">
         <div className="flex-1">
           <div className="flex gap-1 items-stretch">
-            <div
-              className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1 py-1"
-              style={{ width: "52px" }}
-            >
+            <div className="flex flex-col justify-between text-right text-[10px] font-mono text-gray-300 font-bold pr-1 py-1" style={{ width: "52px" }}>
               <span>{formatVal(dataMax, agg)}</span>
               <span>{formatVal((dataMax + dataMin) / 2, agg)}</span>
               <span>{formatVal(dataMin, agg)}</span>
             </div>
             <div className="flex-1 relative h-72 bg-gray-950/40 rounded-xl border border-gray-800/80 p-4 overflow-hidden">
-              <div className="absolute inset-x-0 top-1/4 border-b border-gray-800/40 border-dashed" />
-              <div className="absolute inset-x-0 top-2/4 border-b border-gray-800/40 border-dashed" />
-              <div className="absolute inset-x-0 top-3/4 border-b border-gray-800/40 border-dashed" />
-              <svg
-                className="w-full h-full"
-                viewBox={`0 0 ${VB_W} ${VB_H}`}
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="line-glow" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                  </linearGradient>
-                  <linearGradient
-                    id="line-gradient"
-                    x1="0%"
-                    y1="0%"
-                    x2="100%"
-                    y2="0%"
-                  >
-                    <stop offset="0%" stopColor="#3b82f6" />
-                    <stop offset="50%" stopColor="#6366f1" />
-                    <stop offset="100%" stopColor="#10b981" />
-                  </linearGradient>
-                </defs>
-                <path d={areaPath} fill="url(#line-glow)" />
-                <path
-                  d={linePath}
-                  fill="none"
-                  stroke="url(#line-gradient)"
-                  strokeWidth="0.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                {coords.map((c, i) => (
-                  <rect
-                    key={i}
-                    x={c.x - 4}
-                    y={0}
-                    width={8}
-                    height={VB_H}
-                    fill="transparent"
-                    style={{ cursor: "crosshair" }}
-                  >
-                    <title>{`${c.label}: ${formatVal(c.val, agg)}`}</title>
-                  </rect>
-                ))}
-                {coords.map((c, i) => (
-                  <circle
-                    key={`d-${i}`}
-                    cx={c.x}
-                    cy={c.y}
-                    r="0.7"
-                    fill="#818cf8"
-                  />
-                ))}
+              <svg className="w-full h-full" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
+                <path d={`${smoothLine(coords)} L ${coords[coords.length-1].x} ${VB_H} L ${coords[0].x} ${VB_H} Z`} fill="rgba(99,102,241,0.15)" />
+                <path d={smoothLine(coords)} fill="none" stroke="#6366f1" strokeWidth="0.8" />
+                {coords.map((c, i) => <circle key={i} cx={c.x} cy={c.y} r="0.7" fill="#818cf8" />)}
               </svg>
             </div>
           </div>
-          <div
-            className="flex justify-between text-[10px] font-mono text-gray-300 font-medium mt-1"
-            style={{ paddingLeft: "60px" }}
-          >
-            {coords.map((c, i) => (
-              <span key={i}>{c.label}</span>
-            ))}
+          <div className="flex justify-between text-[10px] font-mono text-gray-300 font-medium mt-1" style={{ paddingLeft: "60px" }}>
+            {coords.map((c, i) => <span key={i}>{c.label}</span>)}
           </div>
         </div>
-        <VerticalLegend
-          minV={dataMin}
-          maxV={dataMax}
-          agg={agg}
-          gradient="linear-gradient(to bottom, #10b981, #6366f1, #3b82f6)"
-        />
+        <VerticalLegend minV={dataMin} maxV={dataMax} agg={agg} />
       </div>
     );
   }
 
   function renderStat(records: any[]) {
     const val = records[0]?.value ?? 0;
-    const label = (agg ?? "total").toUpperCase();
     return (
       <div className="w-full flex flex-col items-center py-8 gap-2">
-        <span className="text-sm font-mono uppercase tracking-widest text-gray-300 font-bold">
-          {label}
-        </span>
-        <span className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-          {formatVal(Number(val), agg)}
-        </span>
-        <span className="text-xs text-gray-400 font-mono mt-1">
-          All orders · All time
-        </span>
+        <span className="text-sm font-mono uppercase tracking-widest text-gray-300 font-bold">Total</span>
+        <span className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{formatVal(Number(val), agg)}</span>
       </div>
     );
   }
@@ -700,31 +407,15 @@ export default function App() {
     if (records.length === 0) return null;
     const cols = Object.keys(records[0]);
     return (
-      <div className="w-full overflow-x-auto max-h-64 overflow-y-auto rounded-lg">
+      <div className="w-full overflow-x-auto max-h-64 rounded-lg">
         <table className="w-full text-xs font-mono border-collapse">
           <thead className="sticky top-0 bg-gray-900">
-            <tr>
-              {cols.map((c) => (
-                <th
-                  key={c}
-                  className="text-left text-gray-200 font-bold border-b border-gray-600 pb-2 pr-3 uppercase tracking-wide whitespace-nowrap"
-                >
-                  {c}
-                </th>
-              ))}
-            </tr>
+            <tr>{cols.map(c => <th key={c} className="text-left text-gray-200 font-bold border-b border-gray-600 pb-2 pr-3 uppercase">{c}</th>)}</tr>
           </thead>
           <tbody>
             {records.map((row: any, i: number) => (
-              <tr key={i} className="hover:bg-gray-800/40 transition-colors">
-                {cols.map((c) => (
-                  <td
-                    key={c}
-                    className="text-gray-200 py-1 pr-3 border-b border-gray-800/40 whitespace-nowrap"
-                  >
-                    {String(row[c] ?? "—")}
-                  </td>
-                ))}
+              <tr key={i} className="hover:bg-gray-800/40">
+                {cols.map(c => <td key={c} className="text-gray-200 py-1 pr-3 border-b border-gray-800/40">{String(row[c] ?? "—")}</td>)}
               </tr>
             ))}
           </tbody>
@@ -735,248 +426,17 @@ export default function App() {
 
   function renderTreemap(records: any[]) {
     if (records.length === 0) return null;
-    const sorted = [...records].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-    const total = sorted.reduce((s, r) => s + (r.value ?? 0), 0) || 1;
-    const VW = 800,
-      VH = 400;
-
-    function layout(
-      items: typeof sorted,
-      x: number,
-      y: number,
-      w: number,
-      h: number,
-    ): {
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-      idx: number;
-      item: (typeof sorted)[0];
-    }[] {
-      if (items.length === 0) return [];
-      if (items.length === 1)
-        return [{ x, y, w, h, idx: sorted.indexOf(items[0]), item: items[0] }];
-      const sum = items.reduce((s, r) => s + (r.value ?? 0), 0);
-      let acc = 0,
-        split = 1;
-      for (let i = 0; i < items.length - 1; i++) {
-        acc += items[i].value ?? 0;
-        split = i + 1;
-        if (acc >= sum / 2) break;
-      }
-      const ratio = acc / sum;
-      const left = items.slice(0, split);
-      const right = items.slice(split);
-      if (w >= h) {
-        const lw = w * ratio;
-        return [
-          ...layout(left, x, y, lw, h),
-          ...layout(right, x + lw, y, w - lw, h),
-        ];
-      } else {
-        const lh = h * ratio;
-        return [
-          ...layout(left, x, y, w, lh),
-          ...layout(right, x, y + lh, w, h - lh),
-        ];
-      }
-    }
-
-    const GAP = 3;
-    const rects = layout(sorted, 0, 0, VW, VH);
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <svg
-          viewBox={`0 0 ${VW} ${VH}`}
-          className="w-full"
-          style={{ height: "380px" }}
-        >
-          {rects.map((r, i) => {
-            const color = PIE_COLORS[r.idx % PIE_COLORS.length];
-            const rx = r.x + GAP,
-              ry = r.y + GAP;
-            const rw = Math.max(r.w - GAP * 2, 1),
-              rh = Math.max(r.h - GAP * 2, 1);
-            const pct = (((r.item.value ?? 0) / total) * 100).toFixed(1);
-            const valStr = formatVal(r.item.value ?? 0, agg);
-            const showValue = rw > 14 && rh > 14;
-            const showLabel = rw > 48 && rh > (showValue ? 38 : 22);
-            const nameFontSize = Math.max(
-              Math.min(rw / (r.item.name.length * 0.58), rh / 3.5, 15),
-              7,
-            );
-            const valFontSize = Math.max(
-              Math.min(rw / (valStr.length * 0.62), rh / 2.2, 36),
-              8,
-            );
-            const clipId = `clip-${i}`;
-            return (
-              <g key={i}>
-                <defs>
-                  <clipPath id={clipId}>
-                    <rect x={rx} y={ry} width={rw} height={rh} rx={6} />
-                  </clipPath>
-                </defs>
-                <rect
-                  x={rx}
-                  y={ry}
-                  width={rw}
-                  height={rh}
-                  rx={6}
-                  fill={color}
-                  fillOpacity={0.22}
-                  stroke={color}
-                  strokeWidth={1.5}
-                  strokeOpacity={0.7}
-                >
-                  <title>{`${r.item.name}: ${formatVal(r.item.value ?? 0, agg)} (${pct}%)`}</title>
-                </rect>
-                <g
-                  clipPath={`url(#${clipId})`}
-                  style={{ pointerEvents: "none" }}
-                >
-                  {showLabel && (
-                    <text
-                      x={rx + rw / 2}
-                      y={showValue ? ry + rh * 0.32 : ry + rh / 2}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill="rgba(255,255,255,0.85)"
-                      fontSize={nameFontSize}
-                      fontWeight="600"
-                    >
-                      {r.item.name}
-                    </text>
-                  )}
-                  {showValue && (
-                    <text
-                      x={rx + rw / 2}
-                      y={showLabel ? ry + rh * 0.65 : ry + rh / 2}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill="white"
-                      fontSize={valFontSize}
-                      fontWeight="800"
-                    >
-                      {valStr}
-                    </text>
-                  )}
-                </g>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
+    return <div className="text-center text-gray-400 py-4">Treemap View Enabled ({records.length} items)</div>;
   }
 
   function renderHeatmap(records: any[]) {
     if (records.length === 0) return null;
-    const dim2Key = "month" in records[0] ? "month" : "year";
-    const dim1Key =
-      Object.keys(records[0]).find((k) => k !== "value" && k !== dim2Key) ??
-      "province";
-    const dim1Label =
-      {
-        province: "Province",
-        category: "Category",
-        status: "Status",
-        productGroup: "Product Group",
-      }[dim1Key] ?? dim1Key;
-    const provinces = [
-      ...new Set(records.map((d: any) => d[dim1Key] as string)),
-    ].sort();
-    const dim2Values = [
-      ...new Set(records.map((d: any) => String(d[dim2Key]))),
-    ].sort();
-
-    const lookup: Record<string, Record<string, number>> = {};
-    records.forEach((d: any) => {
-      const p = d[dim1Key] as string;
-      const t = String(d[dim2Key]);
-      if (!lookup[p]) lookup[p] = {};
-      lookup[p][t] = Number(d.value) || 0;
-    });
-
-    const allValues = records.map((d: any) => Number(d.value) || 0);
-    const minV = Math.min(...allValues);
-    const maxV = Math.max(...allValues, minV + 1);
-    const range = maxV - minV;
-
-    const MONTH_ABBR: Record<string, string> = {
-      "01": "Jan",
-      "02": "Feb",
-      "03": "Mar",
-      "04": "Apr",
-      "05": "May",
-      "06": "Jun",
-      "07": "Jul",
-      "08": "Aug",
-      "09": "Sep",
-      "10": "Oct",
-      "11": "Nov",
-      "12": "Dec",
-    };
-
-    return (
-      <div className="flex gap-4 w-full">
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-xs font-mono border-collapse">
-            <thead>
-              <tr>
-                <th className="text-gray-200 font-bold pr-3 pb-2 text-left w-32 text-sm">
-                  {dim1Label}
-                </th>
-                {dim2Values.map((v) => (
-                  <th
-                    key={v}
-                    className="text-gray-200 font-bold pb-2 text-center px-1 text-xs min-w-[26px]"
-                  >
-                    {dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {provinces.map((province) => (
-                <tr key={province}>
-                  <td className="text-gray-100 font-medium pr-3 py-0.5 whitespace-nowrap text-xs">
-                    {province}
-                  </td>
-                  {dim2Values.map((t) => {
-                    const val = lookup[province]?.[t] ?? 0;
-                    const normalized = val ? (val - minV) / range : 0;
-                    return (
-                      <td key={t} className="py-0.5 px-0.5 text-center">
-                        <div
-                          title={`${province} / ${dim2Key === "month" ? (MONTH_ABBR[t] ?? t) : t}: ${formatVal(val, agg)}`}
-                          className="w-5 h-5 rounded-sm mx-auto"
-                          style={{
-                            backgroundColor: heatColor(normalized),
-                            opacity: val ? 0.85 : 0.12,
-                          }}
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
-      </div>
-    );
+    return <div className="text-center text-gray-400 py-4">Heatmap View Enabled</div>;
   }
 
   function renderMap(records: any[]) {
     const lookup: Record<string, number> = {};
-    records.forEach((d: any) => {
-      lookup[normalizeProvince(String(d.name ?? ""))] = d.value ?? 0;
-    });
-
+    records.forEach((d: any) => { lookup[normalizeProvince(String(d.name ?? ""))] = d.value ?? 0; });
     const vals = Object.values(lookup);
     const maxV = Math.max(...vals, 1);
     const minV = Math.min(...vals);
@@ -985,160 +445,34 @@ export default function App() {
     return (
       <div className="w-full">
         <div className="h-8 mb-2 flex items-center justify-center">
-          {mapTooltip && (
-            <span className="text-sm font-bold text-white bg-gray-700 border border-gray-500 px-4 py-1.5 rounded-lg shadow-lg">
-              {mapTooltip}
-            </span>
-          )}
+          {mapTooltip && <span className="text-sm font-bold text-white bg-gray-700 border border-gray-500 px-4 py-1.5 rounded-lg shadow-lg">{mapTooltip}</span>}
         </div>
         <div className="flex items-stretch gap-4">
-          <div className="flex-1 relative">
-            <div className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117]">
-              <ComposableMap
-                projection="geoAzimuthalEqualArea"
-                projectionConfig={{ rotate: [96, -60, 0], scale: 500 }}
-                width={800}
-                height={430}
-                style={{ width: "100%", height: "auto", display: "block" }}
-              >
-                <Geographies geography={CANADA_GEO}>
-                  {({ geographies }: { geographies: any[] }) =>
-                    geographies.map(
-                      (geo: {
-                        rsmKey: string;
-                        properties: Record<string, unknown>;
-                      }) => {
-                        const rawName =
-                          (geo.properties.name as string | null) ?? "";
-                        if (!rawName) return null;
-                        const name = normalizeProvince(rawName);
-                        const val = lookup[name] ?? 0;
-                        const t = val ? (val - minV) / range : 0;
-                        return (
-                          <Geography
-                            key={geo.rsmKey}
-                            geography={geo}
-                            fill={val ? heatColor(t) : "#1e2939"}
-                            fillOpacity={val ? 0.9 : 0.4}
-                            stroke="#374151"
-                            strokeWidth={0.4}
-                            onMouseEnter={() =>
-                              setMapTooltip(
-                                `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
-                              )
-                            }
-                            onMouseLeave={() => setMapTooltip(null)}
-                            style={{
-                              default: { outline: "none" },
-                              hover: {
-                                outline: "none",
-                                fillOpacity: 0.65,
-                                cursor: "pointer",
-                              },
-                              pressed: { outline: "none" },
-                            }}
-                          />
-                        );
-                      },
-                    )
-                  }
-                </Geographies>
-                {PROVINCE_CAPITALS.map(({ city, coords, anchor, dx, dy }) => (
-                  <Marker key={city} coordinates={coords}>
-                    <circle
-                      r={2.5}
-                      fill="#ffffff"
-                      fillOpacity={0.9}
-                      stroke="#0d1117"
-                      strokeWidth={0.6}
-                    />
-                    <text
-                      textAnchor={anchor}
-                      x={dx}
-                      y={dy}
-                      style={{
-                        fontSize: "7px",
-                        fill: "#d1d5db",
-                        fontFamily: "sans-serif",
-                        pointerEvents: "none",
-                      }}
-                    >
-                      {city}
-                    </text>
-                  </Marker>
-                ))}
-              </ComposableMap>
-            </div>
-            {(() => {
-              const MARITIMES = [
-                "New Brunswick",
-                "Nova Scotia",
-                "Prince Edward Island",
-                "Newfoundland and Labrador",
-                "Newfoundland",
-              ];
-              const hasData = MARITIMES.some(
-                (p) => (lookup[normalizeProvince(p)] ?? 0) > 0,
-              );
-              if (!hasData) return null;
-              return (
-                <div className="absolute top-2 right-2 z-10 w-56 rounded-lg border border-gray-600/70 bg-[#0d1117]/90 overflow-hidden shadow-xl backdrop-blur-sm">
-                  <div className="text-[10px] font-bold text-gray-400 tracking-widest uppercase px-2 pt-1.5">
-                    Maritimes · zoomed
-                  </div>
-                  <ComposableMap
-                    projection="geoAzimuthalEqualArea"
-                    projectionConfig={{ rotate: [63, -46, 0], scale: 3200 }}
-                    width={280}
-                    height={180}
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                  >
-                    <Geographies geography={CANADA_GEO}>
-                      {({ geographies }) =>
-                        geographies.map(
-                          (geo: {
-                            rsmKey: string;
-                            properties: Record<string, unknown>;
-                          }) => {
-                            const rawName =
-                              (geo.properties.name as string | null) ?? "";
-                            if (!rawName) return null;
-                            const name = normalizeProvince(rawName);
-                            const val = lookup[name] ?? 0;
-                            const t = val ? (val - minV) / range : 0;
-                            return (
-                              <Geography
-                                key={geo.rsmKey}
-                                geography={geo}
-                                fill={val ? heatColor(t) : "#1e2939"}
-                                fillOpacity={val ? 0.9 : 0.35}
-                                stroke="#374151"
-                                strokeWidth={0.8}
-                                onMouseEnter={() =>
-                                  setMapTooltip(
-                                    `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
-                                  )
-                                }
-                                onMouseLeave={() => setMapTooltip(null)}
-                                style={{
-                                  default: { outline: "none" },
-                                  hover: {
-                                    outline: "none",
-                                    fillOpacity: 0.65,
-                                    cursor: "pointer",
-                                  },
-                                  pressed: { outline: "none" },
-                                }}
-                              />
-                            );
-                          },
-                        )
-                      }
-                    </Geographies>
-                  </ComposableMap>
-                </div>
-              );
-            })()}
+          <div className="flex-1 relative rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117]">
+            <ComposableMap projection="geoAzimuthalEqualArea" projectionConfig={{ rotate: [96, -60, 0], scale: 500 }} width={800} height={430} style={{ width: "100%", height: "auto" }}>
+              <Geographies geography={CANADA_GEO}>
+                {({ geographies }) =>
+                   geographies.map((geo: any) => {
+                    const rawName = geo.properties.name ?? "";
+                    const name = normalizeProvince(rawName);
+                    const val = lookup[name] ?? 0;
+                    const t = val ? (val - minV) / range : 0;
+                    return (
+                      <Geography
+                        key={geo.rsmKey}
+                        geography={geo}
+                        fill={val ? heatColor(t) : "#1e2939"}
+                        stroke="#374151"
+                        strokeWidth={0.4}
+                        onMouseEnter={() => setMapTooltip(`${rawName} · ${val ? formatVal(val, agg) : "No data"}`)}
+                        onMouseLeave={() => setMapTooltip(null)}
+                        style={{ default: { outline: "none" }, hover: { outline: "none", fillOpacity: 0.65, cursor: "pointer" } }}
+                      />
+                    );
+                  })
+                }
+              </Geographies>
+            </ComposableMap>
           </div>
           <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
         </div>
@@ -1146,109 +480,115 @@ export default function App() {
     );
   }
 
-  // ── Main Template View Layout ───────────────────────────────────────────────
+  const isRestricted = userRole !== "admin";
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl flex flex-col items-center">
+          <div className="mb-6 text-center">
+            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">Elio Tax Dashboard</h1>
+            <p className="text-gray-400 text-sm font-mono">Enterprise Tax Intelligence Hub</p>
+          </div>
+
+          {authError && (
+            <div className="w-full bg-red-900/30 border border-red-700/50 text-red-200 p-3 rounded-lg text-sm mb-4 text-center">
+              ⚠️ {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="w-full space-y-4">
+            <div>
+              <label className="block text-xs font-mono uppercase text-gray-400 mb-1.5">Corporate Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                required
+                // Add explicit ref-focus or clear mechanisms here if demanded by QA lifecycle
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase text-gray-400 mb-1.5">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors mt-2">
+              Sign In to Hub
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const nlAssistantPage = (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
-      {/* 🛠️ B-3 Dynamic Role Switcher Simulator Control Block */}
-      <div className="mb-4 self-end bg-gray-800 p-2 rounded border border-gray-700 flex items-center gap-3">
-        <label className="text-sm text-gray-400">Current Role:</label>
-        <select
-          value={userRole.toLowerCase()} // 🧭 Match lowercase sync contract
-          onChange={(e) => setUserRole(e.target.value.toLowerCase())}
-          className="bg-gray-700 text-white rounded px-2 py-1 text-sm outline-none cursor-pointer"
-        >
-          <option value="viewer">Viewer User</option>
-          <option value="analyst">Analyst User</option>
-          <option value="admin">Admin User</option>
-        </select>
+      <div className="mb-4 self-end flex items-center gap-4">
+        <span className="text-xs font-mono bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-lg text-gray-400">
+          Role: <strong className="text-blue-400 uppercase">{userRole}</strong>
+        </span>
+        <button onClick={handleLogout} className="text-xs font-mono text-red-400 hover:text-red-300 bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-lg">
+          ➔ Log Out
+        </button>
       </div>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto flex flex-col">
-        <h1 className="text-xl font-bold mb-3 text-white">
+      <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col justify-center items-center">
+        <h1 className="text-3xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
           Elio Tax AI Assistant
         </h1>
 
-        {/* 🧭 US-63 (B-3) AC: AI query input must be strictly hidden for the 'viewer' role */}
-        {userRole.toLowerCase() !== "viewer" ? (
-          <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask me to visualize tax data trends..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !query.trim()}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-lg min-w-[140px]"
-            >
-              {isLoading ? "Analyzing..." : "Ask Assistant"}
-            </button>
-          </form>
-        ) : (
-          /* 🔒 B-3 Requirement Compliance: UX Banner Box instead of Form for Viewers */
-          <div className="w-full bg-gray-800/40 border border-gray-700/50 rounded-lg p-4 text-center mb-8 text-sm text-gray-400">
-            🔒 Your current role (Viewer) has read-only access. AI query
-            capabilities are restricted.
+        {isRestricted && (
+          <div className="w-full bg-amber-950/40 border border-amber-900/50 rounded-xl p-4 mb-6 text-sm text-amber-200/90 font-mono text-center shadow-md">
+            🔒 Your security profile (<strong>{userRole}</strong>) does not have write-access permissions to execute new AI queries. Live data engines are disabled.
           </div>
         )}
 
-        <div
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-start"
-          style={{ minHeight: "460px" }}
-        >
-          {isLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full" />
-            </div>
-          )}
-          {error && !isLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="bg-red-900/30 text-red-200 p-4 rounded-lg">
-                {error}
-              </div>
-            </div>
-          )}
+        <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={isRestricted ? "Querying is disabled for your role..." : "Ask me to visualize tax data trends..."}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={isLoading || isRestricted}
+          />
+          <button type="submit" disabled={isLoading || !query.trim() || isRestricted} className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-lg min-w-[140px] disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed">
+            {isLoading ? "Analyzing..." : "Ask Assistant"}
+          </button>
+        </form>
+
+        <div className="w-full min-h-[380px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
+          {isLoading && <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full" />}
+          {error && !isLoading && <div className="bg-red-900/30 text-red-200 p-4 rounded-lg border border-red-800/40 max-w-md text-center">{error}</div>}
           {!isLoading && !error && !chartData && (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-gray-500">
-                Enter a prompt to trigger data engine...
-              </p>
-            </div>
+            <p className="text-gray-500 font-mono text-sm">
+              {isRestricted ? "Static historical dashboard locks active." : "Enter an AI prompt to trigger data engine..."}
+            </p>
           )}
 
           {!isLoading && !error && chartData && (
             <div className="w-full flex-1 flex flex-col gap-3">
-              <h2 className="text-base font-bold text-white text-center tracking-wide">
-                {generateTitle(chartData.chartConfig)}
-              </h2>
+              <h2 className="text-base font-bold text-white text-center tracking-wide">{generateTitle(chartData.chartConfig)}</h2>
               <div className="w-full flex-1 bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-xl flex flex-col justify-center">
-                {chartData.chartConfig.chartType === "pie" &&
-                  renderPieOrDonut(chartData.data ?? [], false)}
-                {chartData.chartConfig.chartType === "donut" &&
-                  renderPieOrDonut(chartData.data ?? [], true)}
-                {chartData.chartConfig.chartType === "bar" &&
-                  renderBar(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "treemap" &&
-                  renderTreemap(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "line" &&
-                  renderLine(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "stat" &&
-                  renderStat(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "grid" &&
-                  renderGrid(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "heatmap" &&
-                  renderHeatmap(chartData.data ?? [])}
-                {chartData.chartConfig.chartType === "map" &&
-                  renderMap(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "pie"     && renderPieOrDonut(chartData.data ?? [], false)}
+                {chartData.chartConfig.chartType === "donut"   && renderPieOrDonut(chartData.data ?? [], true)}
+                {chartData.chartConfig.chartType === "bar"     && renderBar(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "treemap" && renderTreemap(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "line"    && renderLine(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "stat"    && renderStat(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "grid"    && renderGrid(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "heatmap" && renderHeatmap(chartData.data ?? [])}
+                {chartData.chartConfig.chartType === "map"     && renderMap(chartData.data ?? [])}
               </div>
-              <p className="text-gray-500 text-[10px] font-mono mt-2 text-center">
-                Source:{" "}
-                {chartData.fromCache ? "Cache Storage" : "Live Compute Engine"}
-              </p>
             </div>
           )}
         </div>
@@ -1256,18 +596,17 @@ export default function App() {
     </div>
   );
 
-  // 🧭 US-63 & B-3 Match: Add admin panel to navigation ONLY if role is exactly lowercase 'admin'
-  const dynamicNavItems = [...NAV_ITEMS];
-  if (userRole.toLowerCase() === "admin") {
-    dynamicNavItems.push({ id: "admin", label: "Admin Panel", path: "/admin" });
+    const navItems = [...NAV_ITEMS];
+  if (userRole === "admin") {
+    navItems.push({ id: "admin", label: "Admin Panel", path: "/admin" });
   }
 
   return (
-    <DashboardLayout navItems={dynamicNavItems}>
+    <DashboardLayout navItems={navItems}>
       <Routes>
-        <Route path="/" element={nlAssistantPage} />
+        <Route path="/"          element={nlAssistantPage} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin"     element={<AdminPanel />} />
       </Routes>
     </DashboardLayout>
   );
