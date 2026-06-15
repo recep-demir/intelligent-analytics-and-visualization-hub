@@ -146,6 +146,42 @@ function buildItemConditions(args: DashboardStatsArgs): string[] {
 async function fetchMonthlyRevenue(
   args: DashboardStatsArgs,
 ): Promise<{ month: string; revenue: number }[]> {
+  if (hasText(args.category)) {
+    const conditions = buildItemConditions(args);
+    const replacements = buildReplacements(args);
+
+    conditions.push("LOWER(pc.name) = LOWER(:category)");
+
+    if (!hasText(args.status)) {
+      conditions.push("o.status IN ('paid','shipped')");
+    }
+
+    if (!hasYear(args.year)) {
+      conditions.push("o.createdAt >= '2023-01-01'");
+    }
+
+    const where = buildWhereClause(conditions);
+
+    const [rows] = await sequelize.query(
+      `
+      SELECT strftime('%Y-%m', o.createdAt) as month,
+             ROUND(SUM(oi.price * oi.quantity), 2) as revenue
+      FROM OrderItems oi
+      JOIN Orders o ON oi.orderId = o.id
+      LEFT JOIN Addresses a ON o.addressId = a.id
+      JOIN Products p ON oi.productId = p.id
+      JOIN ProductGroupCategories pgc ON p.groupId = pgc.groupId
+      JOIN ProductCategories pc ON pgc.categoryId = pc.id
+      ${where}
+      GROUP BY month
+      ORDER BY month
+    `,
+      { replacements },
+    );
+
+    return rows as { month: string; revenue: number }[];
+  }
+
   const { where, replacements } = buildOrderLevelWhere(args, {
     useMonthlyRevenueDefaults: true,
   });
