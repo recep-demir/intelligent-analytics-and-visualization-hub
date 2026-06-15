@@ -272,10 +272,14 @@ export function Dashboard() {
       {/* Row 2: Horizontal bars */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProductGroupsChart} options={horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group")} />
+          <div className="relative h-96">
+            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
+          </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProvincesChart} options={horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province")} />
+          <div className="relative h-96">
+            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
+          </div>
         </div>
       </div>
 
