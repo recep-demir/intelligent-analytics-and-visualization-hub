@@ -117,7 +117,7 @@ export function AdminPanel() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="team.member@company.com"
+                placeholder="team.member@eliotax.com"
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none"
               />
             </div>
