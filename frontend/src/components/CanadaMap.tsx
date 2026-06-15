@@ -3,26 +3,26 @@ import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps
 
 const CANADA_GEO = "/canada-provinces.json";
 
-const PROVINCE_CAPITALS: {
-  city: string;
+const PROVINCE_LABELS: {
+  province: string;
+  coords: [number, number];
   anchor: "middle" | "start" | "end";
   dx: number;
   dy: number;
-  coords: [number, number];
 }[] = [
-  { city: "Victoria",      coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
-  { city: "Edmonton",      coords: [-113.49, 53.54], anchor: "middle", dx:   0, dy: -4 },
-  { city: "Regina",        coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
-  { city: "Winnipeg",      coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
-  { city: "Toronto",       coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
-  { city: "Québec",        coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
-  { city: "Fredericton",   coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
-  { city: "Halifax",       coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
-  { city: "Charlottetown", coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
-  { city: "St. John's",    coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
-  { city: "Whitehorse",    coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
-  { city: "Yellowknife",   coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
-  { city: "Iqaluit",       coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "British Columbia",          coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "Alberta",                   coords: [-113.49, 53.54], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Saskatchewan",              coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Manitoba",                  coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Ontario",                   coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Quebec",                    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
+  { province: "New Brunswick",             coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
+  { province: "Nova Scotia",               coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
+  { province: "Prince Edward Island",      coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
+  { province: "Newfoundland and Labrador", coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Yukon",                     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Northwest Territories",     coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Nunavut",                   coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
 ];
 
 function normalizeProvince(s: string): string {
@@ -129,16 +129,25 @@ export function CanadaMap({ data, aggregation }: Props) {
                   })
                 }
               </Geographies>
-              {PROVINCE_CAPITALS.map(({ city, coords, anchor, dx, dy }) => (
-                <Marker key={city} coordinates={coords}>
-                  <circle r={2.5} fill="#ffffff" fillOpacity={0.9} stroke="#0d1117" strokeWidth={0.6} />
+              {PROVINCE_LABELS.map(({ province, coords, anchor, dx, dy }) => (
+                <Marker key={province} coordinates={coords}>
+                  <circle
+                    r={2.5}
+                    fill="#ffffff"
+                    fillOpacity={0.9}
+                    stroke="#0d1117"
+                    strokeWidth={0.6}
+                    style={{ cursor: "pointer" }}
+                    onMouseEnter={() => setTooltip(province)}
+                    onMouseLeave={() => setTooltip(null)}
+                  />
                   <text
                     textAnchor={anchor}
                     x={dx}
                     y={dy}
                     style={{ fontSize: "7px", fill: "#d1d5db", fontFamily: "sans-serif", pointerEvents: "none" }}
                   >
-                    {city}
+                    {province}
                   </text>
                 </Marker>
               ))}
