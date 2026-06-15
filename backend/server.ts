@@ -18,6 +18,7 @@ import { generateInsights } from "./src/ai/insights";
 import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
 import { authRouter } from "./src/auth/authRoutes";
 import { adminUserRouter } from "./src/admin/userRoutes";
+import { shareRouter } from "./src/share/shareRoutes";
 
 async function ensureAnalyticsTables() {
   await sequelize.query(`
@@ -110,6 +111,7 @@ export async function startServer(): Promise<void> {
     app.use("/api/admin/users", adminUserRouter);
     app.use("/api/charts", chartRouter);
     app.use("/api/shared-charts", sharedChartRouter);
+    app.use("/api/share", shareRouter);
     // Insights are deterministic for the same question — cache them in memory
     const insightsCache = new Map<string, string[]>();
 
@@ -247,6 +249,9 @@ export async function startServer(): Promise<void> {
       );
       console.log(
         `🔗 Shared Chart Links ready at: http://localhost:${PORT}/api/shared-charts`,
+      );
+      console.log(
+        `🔒 Secure Share State ready at: http://localhost:${PORT}/api/share`,
       );
     });
   } catch (error) {
