@@ -30,13 +30,14 @@ export class LocalEngine implements AIEngine {
 
     // Stat: single aggregate KPI — no groupBy dimension in the question
     const hasDimension =
-      / by (province|year|month|status|category|product)/i.test(q) ||
-      /\b(monthly|yearly|annually|each year|each month|by year|by month)\b/.test(q);
+      / (by|per) (province|year|month|status|category|product)/i.test(q) ||
+      /\b(monthly|yearly|annually|each year|each month|by year|by month|per province|per month|per year)\b/.test(q);
     // breakdown/distribution/split/share always imply a dimensional chart — never stat
     const isComparative = /\b(breakdown|distribution|split|proportion|share|percentage|percent)\b/.test(q);
     if (!hasDimension && !isComparative && (
       /\b(what is|how much|overall|how many)\b/.test(q) ||
       /\btotal (revenue|tax|orders?|sales|amount)\b/.test(q) ||
+      /\bsum of (?:all )?orders?\b(?!\s*(?:amount|value|revenue|price|cost|subtotal))/.test(q) ||
       /\b(average|avg) (order|revenue|tax)\b/.test(q)
     )) return "stat";
 

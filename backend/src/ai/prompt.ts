@@ -81,6 +81,7 @@ Key relationships:
   "line"    – time-series / trend  (trend, over time, monthly, by year, year range)
   "pie"     – proportional shares  (split, breakdown, distribution, share, percentage)
   "donut"   – same as pie, when user explicitly says "donut"
+  "treemap" – hierarchical area chart (treemap, tree chart, or category/product group overview without explicit ranking)
   "stat"    – single KPI number    (total revenue, overall sum, one aggregate value)
   "grid"    – tabular / list view  (list, table, show all)
   "map"     – geographic map       (map, geography — only when explicitly asked)
@@ -107,7 +108,15 @@ Key relationships:
   6. "donut"   → chartType "donut"
   7. "map"     → chartType "map"
   8. "heatmap" → chartType "heatmap"
-  9. "list", "table", "show all", "all records" → chartType "grid"
+     Also use "heatmap" when BOTH of these are true:
+     (a) a categorical dimension (status, province, category, productGroup) AND a time dimension (year, month)
+         are mentioned as grouping dimensions in the same query, AND
+     (b) the user did NOT explicitly request a different chart type (bar, line, treemap, pie, map, etc.)
+     Set groupBy to the categorical dimension — the time dimension becomes the second axis.
+  9. "treemap" or "tree chart" → chartType "treemap"
+     Also use "treemap" for category or product group overview queries with no explicit ranking intent
+     (e.g. "show me revenue by category" with no "top N" or superlative).
+  10. "list", "table", "show all", "all records" → chartType "grid"
 
   10. "product group" or "product groups" → groupBy "productGroup"
   11. "categor" (category / categories)   → groupBy "category"
@@ -118,14 +127,20 @@ Key relationships:
   15. Question clearly about analytics data but no rule matches
       → chartType "bar", groupBy "province"
 
-  16. Nonsensical / gibberish / completely unrelated to this domain
+  16. The question references a geographic location that is NOT a Canadian province,
+      territory, or Canada itself (e.g. a foreign country, continent, or city outside Canada)
+      → groupBy "none"  (this platform contains Canadian orders only)
+
+  17. Nonsensical / gibberish / completely unrelated to this domain
       → groupBy "none"
 
 ## Aggregation rules
 
   Set "aggregation" only when the question implies a specific calculation:
   - "average", "avg", "mean"         → "avg"
-  - "count", "how many", "number of" → "count"
+  - "count", "how many", "number of", "sum of orders", "total orders" → "count"
+    (orders are countable entities — "sum/total of orders" means order count, not revenue)
+  - "min and max", "minimum and maximum", "range" → "minmax"
   - "minimum", "min", "lowest"       → "min"
   - "maximum", "max", "highest"      → "max"
   - default (revenue, total, sum)    → omit the field
@@ -134,17 +149,26 @@ Key relationships:
 
   - Year mentioned (e.g. "in 2023", "for 2022"):
     add { "field": "year", "operator": "eq", "value": "2023" }
-  - Province mentioned (e.g. "in Ontario"):
-    add { "field": "province", "operator": "eq", "value": "Ontario" }
-  - "shipped" / "only shipped":
-    add { "field": "status", "operator": "eq", "value": "shipped" }
+  - One or more provinces mentioned: add one filter entry per province using the canonical name below.
+    If multiple provinces are named, add one filter entry for EACH. Example for two provinces:
+    [{ "field": "province", "operator": "eq", "value": "Ontario" },
+     { "field": "province", "operator": "eq", "value": "Yukon" }]
+    Canonical province names (normalise misspellings and aliases to these exact strings):
+      Ontario, Quebec, British Columbia, Alberta, Manitoba, Saskatchewan,
+      Nova Scotia, New Brunswick, Prince Edward Island, Yukon,
+      Northwest Territories (alias: NWT), Nunavut (aliases: Nuvanut, Nunavit),
+      Newfoundland And Labrador (aliases: Newfoundland, Labrador, NL)
+  - Province filters apply even when chartType is "map" — never drop them for map queries.
+  - Order status mentioned ("shipped", "paid", "pending", "cancelled", "cart", "refunded"):
+    add { "field": "status", "operator": "eq", "value": "<status>" }
+    Multiple statuses → one filter entry per status.
   - "top N", "bottom N", "largest N", "smallest N": set "limit" to N (integer)
 
 ## Hard rules — never break these
 
   - Return ONLY valid JSON. No explanation, no markdown, no code fences.
   - dataset MUST always be exactly the string "Orders".
-  - chartType MUST be one of: bar | line | pie | donut | stat | grid | heatmap | map
+  - chartType MUST be one of: bar | line | pie | donut | treemap | stat | grid | heatmap | map
   - groupBy MUST be one of the supported values listed above, or omitted.
   - operator MUST be one of: eq | gt | lt | contains
   - limit MUST be an integer, not a string.
@@ -189,6 +213,42 @@ Convert this question into a ChartConfig JSON object. Return ONLY the JSON — n
 
 "${nl}"
 `.trim()
+}
+
+// ---------------------------------------------------------------------------
+// buildInsightsPrompt — used by GeminiEngine in insights.ts for line/heatmap
+// charts where trend detection is more valuable than rule-based bullets.
+// ---------------------------------------------------------------------------
+export function buildInsightsPrompt(
+  chartType: string,
+  question: string,
+  data: unknown[],
+  resolved?: { aggregation?: string; groupBy?: string | undefined }
+): string {
+  const agg = resolved?.aggregation ?? "sum";
+  const metricLabel =
+    agg === "count" ? "order count" :
+    agg === "avg"   ? "average revenue" :
+    agg === "min"   ? "minimum order value" :
+    agg === "max"   ? "maximum order value" :
+    "revenue";
+  const dimLabel = resolved?.groupBy ?? "category";
+
+  return `
+You are a concise data analyst. A user asked: "${question}"
+Chart type: ${chartType}
+Metric: ${metricLabel} — the "value" field in the data represents ${metricLabel}. Always call it "${metricLabel}".
+Primary dimension: ${dimLabel}
+Data (JSON, up to 60 rows shown):
+${JSON.stringify(data.slice(0, 60), null, 2)}
+
+Write exactly 2-3 analyst insights as plain bullet points (one per line, starting with •).
+Rules:
+- Focus on trends over time, peaks, troughs, notable gaps, and meaningful comparisons.
+- Format values appropriately: use "$X.XK" for revenue, plain numbers for counts.
+- Never use the raw field name "value" or backticks. Never reuse vague words from the user's question as the metric name.
+- No introduction, no conclusion, no markdown — just the bullet lines.
+`.trim();
 }
 
 // ---------------------------------------------------------------------------
