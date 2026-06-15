@@ -16,7 +16,7 @@ import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
-import type { KpiData, ChartDataShape, LineDataset, BarDataset, DoughnutDataset } from "../types/dashboard";
+import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset, DoughnutDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
 ChartJS.register(
@@ -214,11 +214,22 @@ export function Dashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label={isFiltered ? "Total Revenue (filtered)" : "Total Revenue"} value={formatCurrency(kpis.totalRevenue)} subtitle="paid + shipped orders" />
-        <KpiCard label="Completed Orders"  value={kpis.completedOrders.toLocaleString()} />
-        <KpiCard label="Avg Order Value"   value={formatCurrency(kpis.avgOrderValue)} />
-        <KpiCard label="Conversion Rate"   value={`${kpis.conversionRate.toFixed(1)}%`} subtitle="completed ÷ all orders" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard
+          label="Gross Revenue"
+          value={formatCurrency(data.taxSummary.grossRevenue)}
+          subtitle="net sales + tax collected"
+        />
+        <KpiCard
+          label="Net Subtotal (Before Tax)"
+          value={formatCurrency(data.taxSummary.netSales)}
+          subtitle="pre-tax revenue"
+        />
+        <KpiCard
+          label="Total Tax Collected"
+          value={formatCurrency(data.taxSummary.totalTaxCollected)}
+          subtitle="regulatory tax liability"
+        />
       </div>
 
       {/* Province Map */}

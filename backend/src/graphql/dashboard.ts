@@ -1,7 +1,14 @@
 import { sequelize } from "../../models";
 
 export const dashboardTypeDefs = `#graphql
+  type TaxSummary {
+    grossRevenue:      Float!
+    netSales:          Float!
+    totalTaxCollected: Float!
+  }
+
   type DashboardStats {
+    taxSummary:       TaxSummary!
     monthlyRevenue:   [MonthlyRevenue!]!
     ordersByStatus:   [StatusCount!]!
     topProductGroups: [GroupRevenue!]!
@@ -149,6 +156,32 @@ function buildItemConditions(args: DashboardStatsArgs): string[] {
   }
 
   return conditions;
+}
+
+async function fetchTaxSummary(
+  args: DashboardStatsArgs,
+): Promise<{ grossRevenue: number; netSales: number; totalTaxCollected: number }> {
+  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT
+      ROUND(SUM(o.subtotal + o.total), 2) as grossRevenue,
+      ROUND(SUM(o.subtotal), 2)           as netSales,
+      ROUND(SUM(o.total), 2)              as totalTaxCollected
+    FROM Orders o
+    LEFT JOIN Addresses a ON o.addressId = a.id
+    ${where}
+  `,
+    { replacements },
+  );
+
+  const row = (rows as any[])[0] ?? {};
+  return {
+    grossRevenue:      row.grossRevenue      ?? 0,
+    netSales:          row.netSales          ?? 0,
+    totalTaxCollected: row.totalTaxCollected ?? 0,
+  };
 }
 
 async function fetchMonthlyRevenue(
@@ -322,12 +355,14 @@ export const dashboardResolvers = {
   Query: {
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
       const [
+        taxSummary,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,
         topProvinces,
         categoryRevenue,
       ] = await Promise.all([
+        fetchTaxSummary(args),
         fetchMonthlyRevenue(args),
         fetchOrdersByStatus(args),
         fetchTopProductGroups(args),
@@ -336,6 +371,7 @@ export const dashboardResolvers = {
       ]);
 
       return {
+        taxSummary,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,

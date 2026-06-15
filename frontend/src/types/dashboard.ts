@@ -5,11 +5,18 @@ export interface ProvinceCount   { province: string; orders: number  }
 export interface CategoryRevenue { category: string; revenue: number }
 
 export interface DashboardStats {
+  taxSummary:       TaxSummary;
   monthlyRevenue:   MonthlyRevenue[];
   ordersByStatus:   StatusCount[];
   topProductGroups: GroupRevenue[];
   topProvinces:     ProvinceCount[];
   categoryRevenue:  CategoryRevenue[];
+}
+
+export interface TaxSummary {
+  grossRevenue:      number;
+  netSales:          number;
+  totalTaxCollected: number;
 }
 
 export interface KpiData {
