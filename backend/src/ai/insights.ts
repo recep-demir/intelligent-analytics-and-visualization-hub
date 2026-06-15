@@ -19,6 +19,7 @@ function fmt(v: number, agg: string): string {
 }
 
 function pct(part: number, total: number): string {
+  if (total === 0) return "N/A";
   return `${Math.round((part / total) * 100)}%`;
 }
 
@@ -53,13 +54,23 @@ function barInsights(data: DataRow[], q: ResolvedQuery, question: string): strin
     const label = agg === "count" ? "order count" : "revenue";
     out.push(`${rows[0].name} has the weakest ${label} at ${fmt(Number(rows[0].value), agg)}`);
     if (rows.length >= 2) {
-      const gap = ((Number(rows[1].value) / Number(rows[0].value) - 1) * 100).toFixed(0);
-      out.push(`${rows[1].name} is ${gap}% higher at ${fmt(Number(rows[1].value), agg)}`);
+      const base = Number(rows[0].value);
+      if (base > 0) {
+        const gap = ((Number(rows[1].value) / base - 1) * 100).toFixed(0);
+        out.push(`${rows[1].name} is ${gap}% higher at ${fmt(Number(rows[1].value), agg)}`);
+      } else {
+        out.push(`${rows[1].name} is next at ${fmt(Number(rows[1].value), agg)}`);
+      }
     }
     if (rows.length >= 3) {
       const last = rows[rows.length - 1];
-      const ratio = (Number(last.value) / Number(rows[0].value)).toFixed(1);
-      out.push(`${last.name} leads this group at ${fmt(Number(last.value), agg)} — ${ratio}× the weakest`);
+      const base = Number(rows[0].value);
+      if (base > 0) {
+        const ratio = (Number(last.value) / base).toFixed(1);
+        out.push(`${last.name} leads this group at ${fmt(Number(last.value), agg)} — ${ratio}× the weakest`);
+      } else {
+        out.push(`${last.name} leads this group at ${fmt(Number(last.value), agg)}`);
+      }
     }
     return out;
   }
@@ -68,11 +79,14 @@ function barInsights(data: DataRow[], q: ResolvedQuery, question: string): strin
   if (rows.length >= 2) {
     const top = Number(rows[0].value);
     const second = Number(rows[1].value);
-    const ratio = top / second;
-    const pctAhead = Math.round((ratio - 1) * 100);
-    const comparison = ratio >= 1.15
-      ? ` — ${pctAhead}% higher than ${rows[1].name} (${fmt(second, agg)})`
-      : ` — nearly tied with ${rows[1].name} at ${fmt(second, agg)}`;
+    const comparison = second > 0
+      ? (() => {
+          const pctAhead = Math.round((top / second - 1) * 100);
+          return top / second >= 1.15
+            ? ` — ${pctAhead}% higher than ${rows[1].name} (${fmt(second, agg)})`
+            : ` — nearly tied with ${rows[1].name} at ${fmt(second, agg)}`;
+        })()
+      : ` — ${rows[1].name} has no recorded ${agg === "count" ? "orders" : "revenue"}`;
     out.push(`${rows[0].name} leads at ${fmt(top, agg)}${comparison}`);
   } else if (rows.length === 1) {
     out.push(`${rows[0].name}: ${fmt(Number(rows[0].value), agg)}`);
@@ -98,6 +112,7 @@ function pieInsights(data: DataRow[], q: ResolvedQuery): string[] {
 
   const rows  = [...data].sort((a, b) => Number(b.value) - Number(a.value));
   const total = rows.reduce((s, r) => s + Number(r.value), 0);
+  if (total === 0) return [];
   const agg   = q.aggregation;
   const out: string[] = [];
 
@@ -171,11 +186,13 @@ function heatmapInsights(data: DataRow[], q: ResolvedQuery): string[] {
   if (topDim1.length >= 2) {
     const [n1, v1] = topDim1[0];
     const [n2, v2] = topDim1[1];
-    const pctAhead = Math.round(((v1 / v2) - 1) * 100);
     const label = agg === "count" ? "orders" : "revenue";
-    out.push(
-      `${n1} leads all ${dim1}s in total ${label} — ${pctAhead}% ahead of ${n2}`
-    );
+    if (v2 > 0) {
+      const pctAhead = Math.round(((v1 / v2) - 1) * 100);
+      out.push(`${n1} leads all ${dim1}s in total ${label} — ${pctAhead}% ahead of ${n2}`);
+    } else {
+      out.push(`${n1} leads all ${dim1}s in total ${label} at ${fmt(v1, agg)}`);
+    }
   }
 
   // Best dim2 (column dimension) — sum across all rows

@@ -97,7 +97,8 @@ export async function startServer(): Promise<void> {
       ? new GeminiEngine(process.env.GEMINI_API_KEY)
       : new LocalEngine();
 
-    const adapter = new AIAdapter(engine);
+    const primaryEngineName = process.env.GEMINI_API_KEY ? "gemini" : "local" as const
+    const adapter = new AIAdapter(engine, primaryEngineName);
     const engineName = process.env.GEMINI_API_KEY ? "Gemini" : "Local";
     console.log(`🧠 AI Engine: ${engineName}`);
 
@@ -189,8 +190,9 @@ export async function startServer(): Promise<void> {
           console.error("⚠️ SQL error:", dbError);
         }
 
-        // Step 6 — Generate insights (cached by question to avoid repeat Gemini calls)
-        const cachedInsights = insightsCache.get(question);
+        // Step 6 — Generate insights (cached by question + data signature to avoid stale results)
+        const insightsCacheKey = `${question}::${totalOrders}::${data.length}`;
+        const cachedInsights = insightsCache.get(insightsCacheKey);
         const insights = cachedInsights ?? await generateInsights(
           resolved.chartType,
           data,
@@ -198,7 +200,7 @@ export async function startServer(): Promise<void> {
           question,
           process.env.GEMINI_API_KEY,
         );
-        if (!cachedInsights) insightsCache.set(question, insights);
+        if (!cachedInsights) insightsCache.set(insightsCacheKey, insights);
 
         return res.status(200).json({
           chartConfig: {

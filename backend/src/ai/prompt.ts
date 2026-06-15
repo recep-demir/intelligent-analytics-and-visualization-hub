@@ -127,7 +127,11 @@ Key relationships:
   15. Question clearly about analytics data but no rule matches
       → chartType "bar", groupBy "province"
 
-  16. Nonsensical / gibberish / completely unrelated to this domain
+  16. The question references a geographic location that is NOT a Canadian province,
+      territory, or Canada itself (e.g. a foreign country, continent, or city outside Canada)
+      → groupBy "none"  (this platform contains Canadian orders only)
+
+  17. Nonsensical / gibberish / completely unrelated to this domain
       → groupBy "none"
 
 ## Aggregation rules

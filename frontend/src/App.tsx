@@ -20,10 +20,11 @@ const NAV_ITEMS = [
 
 type Capital = { city: string; coords: [number, number]; lx: number; ly: number; anchor: "middle" | "start" | "end" };
 
-// Main map — largest/most recognizable cities per province (excludes Maritimes shown in zoomed inset)
-// lx/ly push labels into open ocean/margin space; nearby cities staggered vertically to avoid overlap
-// Iqaluit routes DOWN to avoid being hidden under the Maritimes inset box (absolute-positioned overlay)
-const PROVINCE_CAPITALS: Capital[] = [
+// Main map — largest/most recognizable city per province (NOT provincial capitals — Vancouver, Calgary,
+// and Montréal are used instead of Victoria, Edmonton, and Quebec City for better geographic orientation).
+// lx/ly push labels into open ocean/margin space; nearby cities staggered vertically to avoid overlap.
+// Iqaluit routes DOWN to avoid being hidden under the Maritimes inset box (absolute-positioned overlay).
+const PROVINCE_MARKERS: Capital[] = [
   { city: "Vancouver",   coords: [-123.12, 49.28], lx: -72, ly:  -5, anchor: "end"    }, // Pacific → far left upper
   { city: "Calgary",     coords: [-114.07, 51.05], lx: -40, ly:  40, anchor: "end"    }, // Alberta → far left lower (stagger vs Vancouver)
   { city: "Regina",      coords: [-104.62, 50.45], lx:   0, ly:  55, anchor: "middle" }, // Saskatchewan → straight down
@@ -36,8 +37,8 @@ const PROVINCE_CAPITALS: Capital[] = [
   { city: "Iqaluit",     coords: [-68.52,  63.75], lx:  0, ly:   -80, anchor: "start"  }, // Nunavut → right into Baffin Bay (below inset)
 ];
 
-// Maritimes zoomed inset capitals
-const MARITIMES_CAPITALS: Capital[] = [
+// Maritimes zoomed inset — provincial capitals (all three are correct here)
+const MARITIMES_MARKERS: Capital[] = [
   { city: "Fredericton",   coords: [-66.64, 45.96], lx: -14, ly: -10, anchor: "end"   },
   { city: "Charlottetown", coords: [-63.13, 46.24], lx:  14, ly: -10, anchor: "start" },
   { city: "Halifax",       coords: [-63.58, 44.65], lx:  14, ly:  14, anchor: "start" },
@@ -134,6 +135,17 @@ function VerticalLegend({
   );
 }
 
+function parseChartConfig(raw: any, fallbackTitle: string): ChartConfig {
+  return {
+    chartType:   raw?.chartType   ?? raw?.charttype  ?? "bar",
+    groupBy:     raw?.groupBy     ?? raw?.groupby     ?? "",
+    dataset:     raw?.dataset     ?? raw?.dataSet     ?? "",
+    filters:     raw?.filters     ?? [],
+    aggregation: raw?.aggregation,
+    title:       raw?.title       ?? fallbackTitle,
+  };
+}
+
 function generateTitle(config: ChartConfig): string {
   const agg = config.aggregation ?? "sum";
 
@@ -228,7 +240,7 @@ export default function App() {
         // Server returned a message (unrecognized query, no matching rows, etc.)
         // Show it as an info panel, not a red error box
         setChartData({
-          chartConfig: rawData.chartConfig ?? { chartType: "bar", dataset: "Orders", filters: [] },
+          chartConfig: parseChartConfig(rawData.chartConfig, query),
           fromCache: rawData.fromCache ?? false,
           engine: rawData.engine,
           latencyMs: Date.now() - fetchStart,
@@ -239,19 +251,7 @@ export default function App() {
       }
 
       setChartData({
-        chartConfig: {
-          chartType:
-            rawData.chartConfig?.chartType ??
-            rawData.chartConfig?.charttype ??
-            "bar",
-          groupBy:
-            rawData.chartConfig?.groupBy ?? rawData.chartConfig?.groupby ?? "",
-          dataset:
-            rawData.chartConfig?.dataset ?? rawData.chartConfig?.dataSet ?? "",
-          filters: rawData.chartConfig?.filters ?? [],
-          aggregation: rawData.chartConfig?.aggregation,
-          title: rawData.chartConfig?.title ?? query,
-        },
+        chartConfig: parseChartConfig(rawData.chartConfig, query),
         fromCache: rawData.fromCache ?? false,
         engine: rawData.engine,
         latencyMs: Date.now() - fetchStart,
@@ -1034,7 +1034,7 @@ export default function App() {
                     )
                   }
                 </Geographies>
-                {PROVINCE_CAPITALS.map(({ city, coords, lx, ly, anchor }) => (
+                {PROVINCE_MARKERS.map(({ city, coords, lx, ly, anchor }) => (
                   <Marker key={city} coordinates={coords}>
                     <line x1={0} y1={0} x2={lx} y2={ly} stroke="#9ca3af" strokeWidth={0.6} strokeOpacity={0.85} />
                     <circle r={2.8} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.8} />
@@ -1124,7 +1124,7 @@ export default function App() {
                         )
                       }
                     </Geographies>
-                    {MARITIMES_CAPITALS.map(({ city, coords }) => (
+                    {MARITIMES_MARKERS.map(({ city, coords }) => (
                       <Marker key={city} coordinates={coords}>
                         <circle r={2.5} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.6} />
                       </Marker>

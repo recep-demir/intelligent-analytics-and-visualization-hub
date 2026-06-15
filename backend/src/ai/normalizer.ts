@@ -84,23 +84,27 @@ function inferGroupBy2(question: string): GroupByValue {
 // to the exact string stored in the Addresses table.
 // ---------------------------------------------------------------------------
 const PROVINCE_CANONICAL: Record<string, string> = {
-  // British Columbia
+  // Full names (lowercase) → exact DB value (Title Case).
+  // Required because Gemini may return lowercase province names.
+  "ontario":              "Ontario",
+  "british columbia":     "British Columbia",
+  "alberta":              "Alberta",
+  "manitoba":             "Manitoba",
+  "saskatchewan":         "Saskatchewan",
+  "nova scotia":          "Nova Scotia",
+  "new brunswick":        "New Brunswick",
+  "prince edward island": "Prince Edward Island",
+  "yukon":                "Yukon",
+  "quebec":               "Quebec",
+  // Abbreviations and postal codes
   "bc": "British Columbia", "b.c.": "British Columbia",
-  // Alberta
   "ab": "Alberta",
-  // Saskatchewan
   "sk": "Saskatchewan",
-  // Manitoba
   "mb": "Manitoba",
-  // Ontario
   "on": "Ontario",
-  // Quebec / Québec
   "qc": "Quebec", "québec": "Quebec", "pq": "Quebec",
-  // New Brunswick
   "nb": "New Brunswick",
-  // Nova Scotia
   "ns": "Nova Scotia",
-  // Prince Edward Island
   "pei": "Prince Edward Island", "p.e.i.": "Prince Edward Island",
   // Newfoundland and Labrador — all common variants
   "newfoundland and labrador": "Newfoundland and Labrador",
