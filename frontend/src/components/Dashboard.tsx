@@ -140,13 +140,13 @@ export function Dashboard() {
     }],
   }), [data?.topProvinces]);
 
-  const categoryRevenueChart = useMemo((): ChartDataShape<BarDataset> => ({
+  const categoryBarChart = useMemo((): ChartDataShape<BarDataset> => ({
     labels: data?.categoryRevenue.map(c => c.category) ?? [],
     datasets: [{
       label: "Revenue",
       data:  data?.categoryRevenue.map(c => c.revenue) ?? [],
-      backgroundColor: [CHART_COLORS[0], CHART_COLORS[1]],
-      borderRadius:    6,
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
     }],
   }), [data?.categoryRevenue]);
 
@@ -269,9 +269,9 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Row 3: Category Revenue */}
+      {/* Row 3: Tax & Sales Contribution by Product Category */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={categoryRevenueChart} options={baseChartOptions("Shoes vs Apparel — Revenue")} />
+        <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category")} />
       </div>
     </div>
   );

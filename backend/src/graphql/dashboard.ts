@@ -327,8 +327,6 @@ async function fetchCategoryRevenue(
 
   if (hasText(args.category)) {
     conditions.push("LOWER(pc.name) = LOWER(:category)");
-  } else {
-    conditions.push("pc.name IN ('shoes','apparel')");
   }
 
   const where = buildWhereClause(conditions);
