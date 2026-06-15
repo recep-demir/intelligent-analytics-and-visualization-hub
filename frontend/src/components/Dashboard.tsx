@@ -14,6 +14,7 @@ import {
 } from "chart.js";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
+import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
 import type { KpiData } from "../types/dashboard";
 
@@ -211,6 +212,15 @@ export function Dashboard() {
         <KpiCard label="Completed Orders"        value={kpis.completedOrders.toLocaleString()} />
         <KpiCard label="Avg Order Value"         value={formatCurrency(kpis.avgOrderValue)} />
         <KpiCard label="Conversion Rate"         value={`${kpis.conversionRate.toFixed(1)}%`} subtitle="completed ÷ all orders" />
+      </div>
+
+      {/* Province Map */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
+        <CanadaMap
+          data={data.topProvinces.map(p => ({ name: p.province, value: p.orders }))}
+          aggregation="count"
+        />
       </div>
 
       {/* Row 1: Line + Doughnut */}
