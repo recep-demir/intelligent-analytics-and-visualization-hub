@@ -195,6 +195,50 @@ SharedChartLink.belongsTo(SavedChart, {
   foreignKey: 'savedChartId'
 });
 
+export class SharedState extends Model {
+  declare uuid: string;
+  declare stateJson: string;
+  declare createdByUserId: number;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+SharedState.init(
+  {
+    uuid: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+      allowNull: false
+    },
+    stateJson: {
+      type: DataTypes.TEXT,
+      allowNull: false
+    },
+    createdByUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    }
+  },
+  {
+    sequelize,
+    modelName: 'SharedState',
+    tableName: 'SharedStates',
+    timestamps: true
+  }
+);
+
+User.hasMany(SharedState, {
+  foreignKey: 'createdByUserId'
+});
+
+SharedState.belongsTo(User, {
+  foreignKey: 'createdByUserId'
+});
+
 try {
   extendTypes({
     Query: {
