@@ -4,6 +4,7 @@ export interface StatusCount     { status: string;   count: number  }
 export interface GroupRevenue    { name: string;     revenue: number }
 export interface ProvinceCount   { province: string; orders: number  }
 export interface CategoryRevenue { category: string; revenue: number }
+export interface ProductRevenue  { name: string;     revenue: number }
 
 export interface DashboardStats {
   taxSummary:       TaxSummary;
@@ -13,6 +14,7 @@ export interface DashboardStats {
   topProductGroups: GroupRevenue[];
   topProvinces:     ProvinceCount[];
   categoryRevenue:  CategoryRevenue[];
+  bottomProducts:   ProductRevenue[];
 }
 
 export interface TaxSummary {

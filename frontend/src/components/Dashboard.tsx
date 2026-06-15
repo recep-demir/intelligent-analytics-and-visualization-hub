@@ -149,6 +149,16 @@ export function Dashboard() {
     }],
   }), [data?.categoryRevenue]);
 
+  const bottomProductsChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.bottomProducts.map(p => p.name) ?? [],
+    datasets: [{
+      label: "Revenue",
+      data:  data?.bottomProducts.map(p => p.revenue) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.bottomProducts]);
+
   const mapData = useMemo(
     () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders })) ?? [],
     [data?.topProvinces],
@@ -262,6 +272,11 @@ export function Dashboard() {
       {/* Row 3: Tax & Sales Contribution by Product Category */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
         <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category")} />
+      </div>
+
+      {/* Row 4: Top 5 Lowest-Performing Products */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <Bar data={bottomProductsChart} options={horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue")} />
       </div>
     </div>
   );

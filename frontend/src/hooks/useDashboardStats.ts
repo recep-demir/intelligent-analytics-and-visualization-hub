@@ -38,6 +38,7 @@ function buildQuery(filters: DashboardFilters): string {
         topProductGroups { name revenue }
         topProvinces     { province orders }
         categoryRevenue  { category revenue }
+        bottomProducts   { name revenue }
       }
     }
   `;

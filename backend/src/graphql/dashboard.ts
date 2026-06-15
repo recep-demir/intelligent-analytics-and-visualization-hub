@@ -15,6 +15,7 @@ export const dashboardTypeDefs = `#graphql
     topProductGroups: [GroupRevenue!]!
     topProvinces:     [ProvinceCount!]!
     categoryRevenue:  [CategoryRevenue!]!
+    bottomProducts:   [ProductRevenue!]!
   }
 
   type YearlyRevenue   { year: String!     revenue: Float! }
@@ -22,7 +23,8 @@ export const dashboardTypeDefs = `#graphql
   type StatusCount     { status: String!   count: Int!     }
   type GroupRevenue    { name: String!     revenue: Float! }
   type ProvinceCount   { province: String! orders: Int!    }
-  type CategoryRevenue { category: String! revenue: Float! }
+  type CategoryRevenue  { category: String! revenue: Float! }
+  type ProductRevenue   { name: String!     revenue: Float! }
 
   extend type Query {
     dashboardStats(
@@ -371,6 +373,31 @@ async function fetchCategoryRevenue(
   return rows as { category: string; revenue: number }[];
 }
 
+async function fetchBottomProducts(
+  args: DashboardStatsArgs,
+): Promise<{ name: string; revenue: number }[]> {
+  const conditions = buildItemConditions(args);
+  const replacements = buildReplacements(args);
+  const orderJoins = buildItemOrderJoins(args);
+  const where = buildWhereClause(conditions);
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT p.name, ROUND(SUM(oi.price * oi.quantity), 2) as revenue
+    FROM OrderItems oi
+    JOIN Products p ON oi.productId = p.id
+    ${orderJoins}
+    ${where}
+    GROUP BY p.id, p.name
+    ORDER BY revenue ASC
+    LIMIT 5
+    `,
+    { replacements },
+  );
+
+  return rows as { name: string; revenue: number }[];
+}
+
 export const dashboardResolvers = {
   Query: {
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
@@ -382,6 +409,7 @@ export const dashboardResolvers = {
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        bottomProducts,
       ] = await Promise.all([
         fetchTaxSummary(args),
         fetchYearlyRevenue(args),
@@ -390,6 +418,7 @@ export const dashboardResolvers = {
         fetchTopProductGroups(args),
         fetchTopProvinces(args),
         fetchCategoryRevenue(args),
+        fetchBottomProducts(args),
       ]);
 
       return {
@@ -400,6 +429,7 @@ export const dashboardResolvers = {
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        bottomProducts,
       };
     },
   },
