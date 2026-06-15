@@ -396,32 +396,23 @@ export default function App() {
         return;
       }
 
-      setChartData({
-        chartConfig: parseChartConfig(rawData.chartConfig, query),
-        fromCache: rawData.fromCache ?? false,
-        engine: rawData.engine,
-        latencyMs: Date.now() - fetchStart,
-        data: rawData.data,
-        message: rawData.message,
-        insights: Array.isArray(rawData.insights) ? rawData.insights : [],
-        totalOrders: rawData.totalOrders,
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          "Failed to pull analytical insight data from analytical engine.",
-        );
-      }
-
-      const payload = await response.json();
-      setChartData(payload);
-    } catch (err: any) {
-      console.error("AI execution error:", err);
-      setError(err.message || "An analytics engine breakdown occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setChartData({
+          chartConfig: parseChartConfig(rawData.chartConfig, query),
+          fromCache: rawData.fromCache ?? false,
+          engine: rawData.engine,
+          latencyMs: Date.now() - fetchStart,
+          data: rawData.data,
+          message: rawData.message,
+          insights: Array.isArray(rawData.insights) ? rawData.insights : [],
+          totalOrders: rawData.totalOrders,
+        });
+      } catch (err: any) {
+        console.error("AI execution error:", err);
+        setError(err.message || "An analytics engine breakdown occurred.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
   const agg = chartData?.chartConfig.aggregation;
 
