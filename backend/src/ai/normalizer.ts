@@ -80,6 +80,57 @@ function inferGroupBy2(question: string): GroupByValue {
 }
 
 // ---------------------------------------------------------------------------
+// Province alias map — normalises any variant Gemini or LocalEngine might emit
+// to the exact string stored in the Addresses table.
+// ---------------------------------------------------------------------------
+const PROVINCE_CANONICAL: Record<string, string> = {
+  // Full names (lowercase) → exact DB value (Title Case).
+  // Required because Gemini may return lowercase province names.
+  "ontario":              "Ontario",
+  "british columbia":     "British Columbia",
+  "alberta":              "Alberta",
+  "manitoba":             "Manitoba",
+  "saskatchewan":         "Saskatchewan",
+  "nova scotia":          "Nova Scotia",
+  "new brunswick":        "New Brunswick",
+  "prince edward island": "Prince Edward Island",
+  "yukon":                "Yukon",
+  "quebec":               "Quebec",
+  // Abbreviations and postal codes
+  "bc": "British Columbia", "b.c.": "British Columbia",
+  "ab": "Alberta",
+  "sk": "Saskatchewan",
+  "mb": "Manitoba",
+  "on": "Ontario",
+  "qc": "Quebec", "québec": "Quebec", "pq": "Quebec",
+  "nb": "New Brunswick",
+  "ns": "Nova Scotia",
+  "pei": "Prince Edward Island", "p.e.i.": "Prince Edward Island",
+  // Newfoundland and Labrador — all common variants
+  "newfoundland and labrador": "Newfoundland and Labrador",
+  "newfoundland & labrador":   "Newfoundland and Labrador",
+  "newfoundland":              "Newfoundland and Labrador",
+  "labrador":                  "Newfoundland and Labrador",
+  "nl":                        "Newfoundland and Labrador",
+  // Yukon
+  "yt": "Yukon",
+  // Northwest Territories
+  "northwest territories": "Northwest Territories",
+  "nwt": "Northwest Territories", "n.w.t.": "Northwest Territories",
+  "nt":  "Northwest Territories",
+  // Nunavut — including common misspellings
+  "nunavut": "Nunavut", "nuvanut": "Nunavut", "nunavit": "Nunavut", "nu": "Nunavut",
+}
+
+function normalizeProvince(value: string): string {
+  const key = value.toLowerCase().trim()
+  return PROVINCE_CANONICAL[key] ?? value
+}
+
+// ---------------------------------------------------------------------------
+// Dimensions with a known small number of distinct values — no default LIMIT needed
+const LOW_CARDINALITY: GroupByValue[] = ['province', 'status', 'month', 'year', 'total']
+
 // normalize — the single entry point.
 // Transforms raw AI ChartConfig + original question into a ResolvedQuery
 // the SQL builder can trust completely.
@@ -91,9 +142,17 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
   const resolved: ResolvedQuery = {
     chartType,
     groupBy,
-    filters: config.filters ?? [],
+    filters: (() => {
+      const raw = (config.filters ?? []).map(f =>
+        f.field === 'province' ? { ...f, value: normalizeProvince(f.value) } : f
+      )
+      // Default to Canada — this is a Canadian analytics platform.
+      // Gemini doesn't add a country filter unless asked; we enforce it here.
+      const hasCountry = raw.some(f => f.field === 'country')
+      return hasCountry ? raw : [{ field: 'country' as const, operator: 'eq' as const, value: 'ca' }, ...raw]
+    })(),
     aggregation:     detectAggregation(question, config.aggregation),
-    limit:           config.limit ?? 10,
+    limit:           config.limit ?? (LOW_CARDINALITY.includes(groupBy as GroupByValue) ? 9999 : 10),
     limitIsExplicit: config.limit !== undefined,
     sortAsc:         /\b(lowest|least|smallest|fewest|worst)\b/i.test(question),
   }
