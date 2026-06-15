@@ -26,8 +26,9 @@ describe('AIAdapter Strategy Pattern (US-10)', () => {
     expect(mockEngine.resolve).toHaveBeenCalledTimes(1);
     expect(mockEngine.resolve).toHaveBeenCalledWith(mockNl, mockSchemaSdl);
     expect(result).toEqual({
-  chartConfig: mockChartConfig,
-  fromCache: false
-});
+      chartConfig: mockChartConfig,
+      fromCache: false,
+      engine: "local",
+    });
   });
 });
