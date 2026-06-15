@@ -172,7 +172,7 @@ export function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-400">Analytics Dashboard</h1>
         {isFiltered && (
           <button
             onClick={clearFilters}
@@ -225,8 +225,10 @@ export function Dashboard() {
 
       {/* Row 1: Line + Doughnut */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Line data={monthlyRevenueChart} options={baseChartOptions("Monthly Revenue (2023)")} />
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
+          <div className="relative w-full h-64">
+            <Line data={monthlyRevenueChart} options={{ ...baseChartOptions("Monthly Revenue (2023)"), maintainAspectRatio: false }} />
+          </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <Doughnut
