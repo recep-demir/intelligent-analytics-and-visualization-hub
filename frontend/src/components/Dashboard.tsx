@@ -6,22 +6,21 @@ import {
   BarElement,
   LineElement,
   PointElement,
-  ArcElement,
   Title,
   Tooltip,
   Legend,
   Filler,
 } from "chart.js";
-import { Bar, Line, Doughnut } from "react-chartjs-2";
+import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
-import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset, DoughnutDataset } from "../types/dashboard";
+import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
+  PointElement, Title, Tooltip, Legend, Filler,
 );
 
 function baseChartOptions(title: string) {
@@ -110,13 +109,13 @@ export function Dashboard() {
     }],
   }), [data?.monthlyRevenue]);
 
-  const ordersByStatusChart = useMemo((): ChartDataShape<DoughnutDataset> => ({
+  const ordersByStatusChart = useMemo((): ChartDataShape<BarDataset> => ({
     labels: data?.ordersByStatus.map(s => s.status) ?? [],
     datasets: [{
+      label:           "Order Count",
       data:            data?.ordersByStatus.map(s => s.count) ?? [],
-      backgroundColor: DOUGHNUT_COLORS,
-      borderWidth:     2,
-      borderColor:     "#1e293b",
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
     }],
   }), [data?.ordersByStatus]);
 
@@ -238,7 +237,7 @@ export function Dashboard() {
         <CanadaMap data={mapData} aggregation="count" />
       </div>
 
-      {/* Row 1: Line + Doughnut */}
+      {/* Row 1: Line + Order Status Bar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
           <div className="relative w-full h-64">
@@ -246,16 +245,7 @@ export function Dashboard() {
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Doughnut
-            data={ordersByStatusChart}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "right", labels: { color: "#94a3b8" } },
-                title:  { display: true, text: "Orders by Status", color: "#e2e8f0", font: { size: 14 } },
-              },
-            }}
-          />
+          <Bar data={ordersByStatusChart} options={baseChartOptions("Order Volume by Status")} />
         </div>
       </div>
 
