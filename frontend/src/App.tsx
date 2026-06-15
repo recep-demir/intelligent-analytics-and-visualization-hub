@@ -349,7 +349,7 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading || userRole !== "admin") return;
+  if (!query.trim() || isLoading || (userRole !== "admin" && userRole !== "analyst")) return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -1059,9 +1059,8 @@ export default function App() {
       </div>
     );
   }
-
-  const isRestricted = userRole !== "admin";
-
+// allows both roles to see dashboard and Ai assistant to request new data and see live data
+  const isRestricted = userRole !== "admin" && userRole !== "analyst";
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
