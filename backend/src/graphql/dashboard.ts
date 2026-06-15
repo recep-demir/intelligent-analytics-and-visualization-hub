@@ -91,8 +91,6 @@ function buildOrderLevelWhere(
   } else if (hasYear(args.yearFrom) || hasYear(args.yearTo)) {
     if (hasYear(args.yearFrom)) conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) >= :yearFrom");
     if (hasYear(args.yearTo))   conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) <= :yearTo");
-  } else if (options.useMonthlyRevenueDefaults) {
-    conditions.push("o.createdAt >= '2023-01-01'");
   }
 
   if (hasText(args.province)) {
@@ -166,9 +164,6 @@ async function fetchMonthlyRevenue(
       conditions.push("o.status IN ('paid','shipped')");
     }
 
-    if (!hasYear(args.year)) {
-      conditions.push("o.createdAt >= '2023-01-01'");
-    }
 
     const where = buildWhereClause(conditions);
 
