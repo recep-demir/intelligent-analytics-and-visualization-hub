@@ -191,7 +191,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-slate-400">Analytics Dashboard</h1>
         {isFiltered && (
@@ -202,7 +202,7 @@ export function Dashboard() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap gap-3 bg-gray-800 border border-gray-700 rounded-xl p-4">
+      <div className="flex flex-wrap gap-2 sm:gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">Year</span>
           <select className={SELECT_CLS} value={filters.yearFrom ?? ""} onChange={e => set("yearFrom", e.target.value)}>
@@ -260,24 +260,26 @@ export function Dashboard() {
       {/* Row 1: Line + Order Status Bar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
-          <div className="relative w-full h-64">
+          <div className="relative w-full h-64 md:h-96">
             <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={ordersByStatusChart} options={baseChartOptions("Order Volume by Status", "Order Status", "Count")} />
+          <div className="relative h-64 md:h-96">
+            <Bar data={ordersByStatusChart} options={{ ...baseChartOptions("Order Volume by Status", "Order Status", "Count"), maintainAspectRatio: false }} />
+          </div>
         </div>
       </div>
 
       {/* Row 2: Horizontal bars */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <div className="relative h-96">
+          <div className="relative h-64 md:h-96">
             <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <div className="relative h-96">
+          <div className="relative h-64 md:h-96">
             <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
           </div>
         </div>
