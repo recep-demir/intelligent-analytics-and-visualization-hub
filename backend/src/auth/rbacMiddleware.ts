@@ -95,3 +95,9 @@ export const requireAdminOrAnalystJWT = createRoleMiddleware([
   "admin",
   "analyst",
 ]);
+
+export const requireAuthenticatedJWT = createRoleMiddleware([
+  "admin",
+  "analyst",
+  "viewer",
+]);
