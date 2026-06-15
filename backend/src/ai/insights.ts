@@ -187,11 +187,16 @@ function heatmapInsights(data: DataRow[], q: ResolvedQuery): string[] {
     const [n1, v1] = topDim1[0];
     const [n2, v2] = topDim1[1];
     const label = agg === "count" ? "orders" : "revenue";
+    const dim1Plural: Record<string, string> = {
+      category: "categories", status: "statuses",
+      province: "provinces", productGroup: "product groups", product: "products",
+    };
+    const dim1Label = dim1Plural[dim1] ?? `${dim1}s`;
     if (v2 > 0) {
       const pctAhead = Math.round(((v1 / v2) - 1) * 100);
-      out.push(`${n1} leads all ${dim1}s in total ${label} — ${pctAhead}% ahead of ${n2}`);
+      out.push(`${n1} leads all ${dim1Label} in total ${label} — ${pctAhead}% ahead of ${n2}`);
     } else {
-      out.push(`${n1} leads all ${dim1}s in total ${label} at ${fmt(v1, agg)}`);
+      out.push(`${n1} leads all ${dim1Label} in total ${label} at ${fmt(v1, agg)}`);
     }
   }
 
