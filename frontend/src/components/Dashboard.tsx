@@ -90,24 +90,24 @@ export function Dashboard() {
   const kpis = useMemo(() => computeKpis(data), [data]);
 
   const revenueChartTitle = useMemo(() => {
-    if (filters.yearFrom && filters.yearTo) return `Monthly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
-    if (filters.yearFrom) return `Monthly Revenue (from ${filters.yearFrom})`;
-    if (filters.yearTo)   return `Monthly Revenue (up to ${filters.yearTo})`;
-    return "Monthly Revenue (All Years)";
+    if (filters.yearFrom && filters.yearTo) return `Yearly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
+    if (filters.yearFrom) return `Yearly Revenue (from ${filters.yearFrom})`;
+    if (filters.yearTo)   return `Yearly Revenue (up to ${filters.yearTo})`;
+    return "Yearly Revenue (All Years)";
   }, [filters.yearFrom, filters.yearTo]);
 
-  const monthlyRevenueChart = useMemo((): ChartDataShape<LineDataset> => ({
-    labels: data?.monthlyRevenue.map(r => r.month) ?? [],
+  const yearlyRevenueChart = useMemo((): ChartDataShape<LineDataset> => ({
+    labels: data?.yearlyRevenue.map(r => r.year) ?? [],
     datasets: [{
       label: "Revenue",
-      data:  data?.monthlyRevenue.map(r => r.revenue) ?? [],
+      data:  data?.yearlyRevenue.map(r => r.revenue) ?? [],
       borderColor:     "#3b82f6",
       backgroundColor: "rgba(59,130,246,0.15)",
       fill:       true,
       tension:    0.4,
       pointRadius: 4,
     }],
-  }), [data?.monthlyRevenue]);
+  }), [data?.yearlyRevenue]);
 
   const ordersByStatusChart = useMemo((): ChartDataShape<BarDataset> => ({
     labels: data?.ordersByStatus.map(s => s.status) ?? [],
@@ -241,7 +241,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
           <div className="relative w-full h-64">
-            <Line data={monthlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle), maintainAspectRatio: false }} />
+            <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">

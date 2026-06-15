@@ -9,6 +9,7 @@ export const dashboardTypeDefs = `#graphql
 
   type DashboardStats {
     taxSummary:       TaxSummary!
+    yearlyRevenue:    [YearlyRevenue!]!
     monthlyRevenue:   [MonthlyRevenue!]!
     ordersByStatus:   [StatusCount!]!
     topProductGroups: [GroupRevenue!]!
@@ -16,6 +17,7 @@ export const dashboardTypeDefs = `#graphql
     categoryRevenue:  [CategoryRevenue!]!
   }
 
+  type YearlyRevenue   { year: String!     revenue: Float! }
   type MonthlyRevenue  { month: String!    revenue: Float! }
   type StatusCount     { status: String!   count: Int!     }
   type GroupRevenue    { name: String!     revenue: Float! }
@@ -182,6 +184,26 @@ async function fetchTaxSummary(
     netSales:          row.netSales          ?? 0,
     totalTaxCollected: row.totalTaxCollected ?? 0,
   };
+}
+
+async function fetchYearlyRevenue(
+  args: DashboardStatsArgs,
+): Promise<{ year: string; revenue: number }[]> {
+  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT strftime('%Y', o.createdAt) as year, ROUND(SUM(o.subtotal), 2) as revenue
+    FROM Orders o
+    LEFT JOIN Addresses a ON o.addressId = a.id
+    ${where}
+    GROUP BY year
+    ORDER BY year
+    `,
+    { replacements },
+  );
+
+  return rows as { year: string; revenue: number }[];
 }
 
 async function fetchMonthlyRevenue(
@@ -354,6 +376,7 @@ export const dashboardResolvers = {
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
       const [
         taxSummary,
+        yearlyRevenue,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,
@@ -361,6 +384,7 @@ export const dashboardResolvers = {
         categoryRevenue,
       ] = await Promise.all([
         fetchTaxSummary(args),
+        fetchYearlyRevenue(args),
         fetchMonthlyRevenue(args),
         fetchOrdersByStatus(args),
         fetchTopProductGroups(args),
@@ -370,6 +394,7 @@ export const dashboardResolvers = {
 
       return {
         taxSummary,
+        yearlyRevenue,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,

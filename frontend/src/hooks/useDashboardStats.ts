@@ -32,6 +32,7 @@ function buildQuery(filters: DashboardFilters): string {
     query {
       dashboardStats${argStr} {
         taxSummary       { grossRevenue netSales totalTaxCollected }
+        yearlyRevenue    { year revenue }
         monthlyRevenue   { month revenue }
         ordersByStatus   { status count }
         topProductGroups { name revenue }

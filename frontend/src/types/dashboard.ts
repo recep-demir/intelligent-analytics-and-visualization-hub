@@ -1,3 +1,4 @@
+export interface YearlyRevenue   { year: string;     revenue: number }
 export interface MonthlyRevenue  { month: string;    revenue: number }
 export interface StatusCount     { status: string;   count: number  }
 export interface GroupRevenue    { name: string;     revenue: number }
@@ -6,6 +7,7 @@ export interface CategoryRevenue { category: string; revenue: number }
 
 export interface DashboardStats {
   taxSummary:       TaxSummary;
+  yearlyRevenue:    YearlyRevenue[];
   monthlyRevenue:   MonthlyRevenue[];
   ordersByStatus:   StatusCount[];
   topProductGroups: GroupRevenue[];
