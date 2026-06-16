@@ -15,7 +15,7 @@ import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
-import { useCategories } from "../hooks/useCategories";
+import { useFilterOptions } from "../hooks/useFilterOptions";
 import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
@@ -73,9 +73,6 @@ function formatCurrency(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
 }
 
-const YEARS      = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
-const PROVINCES  = ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Nova Scotia","Ontario","Prince Edward Island","Quebec","Saskatchewan"];
-const STATUSES   = ["pending","paid","shipped","cancelled","refunded"];
 
 const SELECT_CLS = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
 
@@ -84,7 +81,7 @@ export function Dashboard() {
     yearFrom: null, yearTo: null, province: null, status: null, category: null,
   });
   const { data, loading, error } = useDashboardStats(filters);
-  const categories = useCategories();
+  const { categories, provinces, statuses, years } = useFilterOptions();
 
   function set(key: keyof DashboardFilters, raw: string) {
     const isYear = key === "yearFrom" || key === "yearTo";
@@ -208,23 +205,23 @@ export function Dashboard() {
           <span className="text-xs text-gray-400">Year</span>
           <select className={SELECT_CLS} value={filters.yearFrom ?? ""} onChange={e => set("yearFrom", e.target.value)}>
             <option value="">From</option>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <span className="text-gray-500 text-xs">–</span>
           <select className={SELECT_CLS} value={filters.yearTo ?? ""} onChange={e => set("yearTo", e.target.value)}>
             <option value="">To</option>
-            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
 
         <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
           <option value="">All provinces</option>
-          {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+          {provinces.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
 
         <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
           <option value="">All statuses</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
         <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>

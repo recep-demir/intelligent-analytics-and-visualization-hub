@@ -28,6 +28,9 @@ export const dashboardTypeDefs = `#graphql
 
   extend type Query {
     categories: [String!]!
+    provinces:  [String!]!
+    statuses:   [String!]!
+    years:      [Int!]!
 
     dashboardStats(
       year: Int
@@ -403,10 +406,29 @@ async function fetchBottomProducts(
 export const dashboardResolvers = {
   Query: {
     categories: async () => {
-      const [rows] = await sequelize.query(
-        `SELECT name FROM ProductCategories ORDER BY name`,
-      );
+      const [rows] = await sequelize.query(`SELECT name FROM ProductCategories ORDER BY name`);
       return (rows as { name: string }[]).map(r => r.name);
+    },
+
+    provinces: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT province FROM Addresses WHERE country = 'ca' AND province IS NOT NULL AND province != '' ORDER BY province`,
+      );
+      return (rows as { province: string }[]).map(r => r.province);
+    },
+
+    statuses: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT status FROM Orders WHERE status IS NOT NULL ORDER BY status`,
+      );
+      return (rows as { status: string }[]).map(r => r.status);
+    },
+
+    years: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT CAST(strftime('%Y', createdAt) AS INT) as year FROM Orders ORDER BY year`,
+      );
+      return (rows as { year: number }[]).map(r => r.year);
     },
 
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
