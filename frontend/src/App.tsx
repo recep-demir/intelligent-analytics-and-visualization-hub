@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Routes, Route } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import {
   ComposableMap,
   Geographies,
@@ -14,8 +14,8 @@ import "./index.css";
 const CANADA_GEO = "/canada-provinces.json";
 
 const NAV_ITEMS = [
-  { id: "assistant", label: "AI Assistant", path: "/" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
+  { id: "assistant", label: "AI Assistant", path: "/assistant" },
 ];
 
 type Capital = {
@@ -318,6 +318,9 @@ export default function App() {
       // 👤 3. Execute dynamic cryptographic role verification lifecycle
       decodeAndSetUserRole(data.token);
 
+      // 📊 Push browser URL straight to the dashboard metrics page on login success
+      window.location.href = "/dashboard";
+
       // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
       setEmail("");
       setPassword("");
@@ -355,7 +358,12 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading || userRole !== "admin") return;
+    if (
+      !query.trim() ||
+      isLoading ||
+      (userRole !== "admin" && userRole !== "analyst")
+    )
+      return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -412,7 +420,6 @@ export default function App() {
         insights: Array.isArray(rawData.insights) ? rawData.insights : [],
         totalOrders: rawData.totalOrders,
       });
-
     } catch (err: any) {
       console.error("AI execution error:", err);
       setError(err.message || "An analytics engine breakdown occurred.");
@@ -424,27 +431,41 @@ export default function App() {
   const agg = chartData?.chartConfig.aggregation;
 
   function renderPieOrDonut(records: any[], isDonut: boolean) {
-    const total = records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
-    const CX = 100, CY = 100, R = 88, INNER_R = isDonut ? 52 : 0;
+    const total =
+      records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
+    const CX = 100,
+      CY = 100,
+      R = 88,
+      INNER_R = isDonut ? 52 : 0;
     const GAP_DEG = 1.5; // degrees of gap between segments
 
     // Build SVG arc paths
     let startAngle = -Math.PI / 2; // start at top
     const slices = records.map((r: any, i: number) => {
       const fraction = (r.value ?? 0) / total;
-      const sweep = fraction * 2 * Math.PI - (GAP_DEG * Math.PI / 180);
+      const sweep = fraction * 2 * Math.PI - (GAP_DEG * Math.PI) / 180;
       const endAngle = startAngle + sweep;
-      const x1 = CX + R * Math.cos(startAngle), y1 = CY + R * Math.sin(startAngle);
-      const x2 = CX + R * Math.cos(endAngle),   y2 = CY + R * Math.sin(endAngle);
-      const xi1 = CX + INNER_R * Math.cos(startAngle), yi1 = CY + INNER_R * Math.sin(startAngle);
-      const xi2 = CX + INNER_R * Math.cos(endAngle),   yi2 = CY + INNER_R * Math.sin(endAngle);
+      const x1 = CX + R * Math.cos(startAngle),
+        y1 = CY + R * Math.sin(startAngle);
+      const x2 = CX + R * Math.cos(endAngle),
+        y2 = CY + R * Math.sin(endAngle);
+      const xi1 = CX + INNER_R * Math.cos(startAngle),
+        yi1 = CY + INNER_R * Math.sin(startAngle);
+      const xi2 = CX + INNER_R * Math.cos(endAngle),
+        yi2 = CY + INNER_R * Math.sin(endAngle);
       const large = sweep > Math.PI ? 1 : 0;
       const path = isDonut
         ? `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${INNER_R} ${INNER_R} 0 ${large} 0 ${xi1} ${yi1} Z`
         : `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
       const midAngle = startAngle + sweep / 2;
-      startAngle = endAngle + (GAP_DEG * Math.PI / 180);
-      return { path, color: PIE_COLORS[i % PIE_COLORS.length], midAngle, fraction, record: r };
+      startAngle = endAngle + (GAP_DEG * Math.PI) / 180;
+      return {
+        path,
+        color: PIE_COLORS[i % PIE_COLORS.length],
+        midAngle,
+        fraction,
+        record: r,
+      };
     });
 
     return (
@@ -452,7 +473,14 @@ export default function App() {
         <div className="relative shrink-0" style={{ width: 200, height: 200 }}>
           <svg viewBox="0 0 200 200" width={200} height={200}>
             {slices.map((s, i) => (
-              <path key={i} d={s.path} fill={s.color} fillOpacity={0.9} stroke="#0f172a" strokeWidth={1}>
+              <path
+                key={i}
+                d={s.path}
+                fill={s.color}
+                fillOpacity={0.9}
+                stroke="#0f172a"
+                strokeWidth={1}
+              >
                 <title>{`${s.record.name}: ${formatVal(s.record.value ?? 0, agg)} (${(s.fraction * 100).toFixed(1)}%)`}</title>
               </path>
             ))}
@@ -468,9 +496,16 @@ export default function App() {
         <div className="space-y-2.5 min-w-[220px]">
           {records.map((record: any, i: number) => (
             <div key={i} className="flex items-center gap-3">
-              <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-              <span className="text-sm text-gray-200 font-medium flex-1">{record.name ?? `Item ${i + 1}`}</span>
-              <span className="text-sm text-blue-300 font-bold font-mono">{formatVal(record.value ?? 0, agg)}</span>
+              <span
+                className="w-3 h-3 rounded-sm shrink-0"
+                style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
+              />
+              <span className="text-sm text-gray-200 font-medium flex-1">
+                {record.name ?? `Item ${i + 1}`}
+              </span>
+              <span className="text-sm text-blue-300 font-bold font-mono">
+                {formatVal(record.value ?? 0, agg)}
+              </span>
             </div>
           ))}
         </div>
@@ -812,16 +847,29 @@ export default function App() {
     if (records.length === 0) return null;
     const sorted = [...records].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     const total = sorted.reduce((s, r) => s + (r.value ?? 0), 0) || 1;
-    const VW = 800, VH = 400;
+    const VW = 800,
+      VH = 400;
 
     function layout(
       items: typeof sorted,
-      x: number, y: number, w: number, h: number,
-    ): { x: number; y: number; w: number; h: number; idx: number; item: (typeof sorted)[0] }[] {
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+    ): {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      idx: number;
+      item: (typeof sorted)[0];
+    }[] {
       if (items.length === 0) return [];
-      if (items.length === 1) return [{ x, y, w, h, idx: sorted.indexOf(items[0]), item: items[0] }];
+      if (items.length === 1)
+        return [{ x, y, w, h, idx: sorted.indexOf(items[0]), item: items[0] }];
       const sum = items.reduce((s, r) => s + (r.value ?? 0), 0);
-      let acc = 0, split = 1;
+      let acc = 0,
+        split = 1;
       for (let i = 0; i < items.length - 1; i++) {
         acc += items[i].value ?? 0;
         split = i + 1;
@@ -832,10 +880,16 @@ export default function App() {
       const right = items.slice(split);
       if (w >= h) {
         const lw = w * ratio;
-        return [...layout(left, x, y, lw, h), ...layout(right, x + lw, y, w - lw, h)];
+        return [
+          ...layout(left, x, y, lw, h),
+          ...layout(right, x + lw, y, w - lw, h),
+        ];
       } else {
         const lh = h * ratio;
-        return [...layout(left, x, y, w, lh), ...layout(right, x, y + lh, w, h - lh)];
+        return [
+          ...layout(left, x, y, w, lh),
+          ...layout(right, x, y + lh, w, h - lh),
+        ];
       }
     }
 
@@ -844,17 +898,29 @@ export default function App() {
 
     return (
       <div className="w-full flex items-center">
-        <svg viewBox={`0 0 ${VW} ${VH}`} className="w-full" style={{ height: "380px" }}>
+        <svg
+          viewBox={`0 0 ${VW} ${VH}`}
+          className="w-full"
+          style={{ height: "380px" }}
+        >
           {rects.map((r, i) => {
             const color = PIE_COLORS[r.idx % PIE_COLORS.length];
-            const rx = r.x + GAP, ry = r.y + GAP;
-            const rw = Math.max(r.w - GAP * 2, 1), rh = Math.max(r.h - GAP * 2, 1);
+            const rx = r.x + GAP,
+              ry = r.y + GAP;
+            const rw = Math.max(r.w - GAP * 2, 1),
+              rh = Math.max(r.h - GAP * 2, 1);
             const pct = (((r.item.value ?? 0) / total) * 100).toFixed(1);
             const valStr = formatVal(r.item.value ?? 0, agg);
             const showValue = rw > 14 && rh > 14;
             const showLabel = rw > 48 && rh > (showValue ? 38 : 22);
-            const nameFontSize = Math.max(Math.min(rw / (r.item.name.length * 0.58), rh / 3.5, 15), 7);
-            const valFontSize = Math.max(Math.min(rw / (valStr.length * 0.62), rh / 2.2, 36), 8);
+            const nameFontSize = Math.max(
+              Math.min(rw / (r.item.name.length * 0.58), rh / 3.5, 15),
+              7,
+            );
+            const valFontSize = Math.max(
+              Math.min(rw / (valStr.length * 0.62), rh / 2.2, 36),
+              8,
+            );
             const clipId = `clip-${i}`;
             return (
               <g key={i}>
@@ -863,27 +929,46 @@ export default function App() {
                     <rect x={rx} y={ry} width={rw} height={rh} rx={6} />
                   </clipPath>
                 </defs>
-                <rect x={rx} y={ry} width={rw} height={rh} rx={6}
-                  fill={color} fillOpacity={0.22}
-                  stroke={color} strokeWidth={1.5} strokeOpacity={0.7}
+                <rect
+                  x={rx}
+                  y={ry}
+                  width={rw}
+                  height={rh}
+                  rx={6}
+                  fill={color}
+                  fillOpacity={0.22}
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.7}
                 >
                   <title>{`${r.item.name}: ${formatVal(r.item.value ?? 0, agg)} (${pct}%)`}</title>
                 </rect>
-                <g clipPath={`url(#${clipId})`} style={{ pointerEvents: "none" }}>
+                <g
+                  clipPath={`url(#${clipId})`}
+                  style={{ pointerEvents: "none" }}
+                >
                   {showLabel && (
                     <text
-                      x={rx + rw / 2} y={showValue ? ry + rh * 0.32 : ry + rh / 2}
-                      textAnchor="middle" dominantBaseline="middle"
-                      fill="rgba(255,255,255,0.85)" fontSize={nameFontSize} fontWeight="600"
+                      x={rx + rw / 2}
+                      y={showValue ? ry + rh * 0.32 : ry + rh / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="rgba(255,255,255,0.85)"
+                      fontSize={nameFontSize}
+                      fontWeight="600"
                     >
                       {r.item.name}
                     </text>
                   )}
                   {showValue && (
                     <text
-                      x={rx + rw / 2} y={showLabel ? ry + rh * 0.65 : ry + rh / 2}
-                      textAnchor="middle" dominantBaseline="middle"
-                      fill="white" fontSize={valFontSize} fontWeight="800"
+                      x={rx + rw / 2}
+                      y={showLabel ? ry + rh * 0.65 : ry + rh / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="white"
+                      fontSize={valFontSize}
+                      fontWeight="800"
                     >
                       {valStr}
                     </text>
@@ -901,10 +986,21 @@ export default function App() {
     if (records.length === 0) return null;
 
     const dim2Key = "month" in records[0] ? "month" : "year";
-    const dim1Key = Object.keys(records[0]).find(k => k !== "value" && k !== dim2Key) ?? "province";
-    const dim1Label: Record<string, string> = { province: "Province", category: "Category", status: "Status", productGroup: "Product Group" };
-    const dim1Values = [...new Set(records.map((d: any) => d[dim1Key] as string))].sort();
-    const dim2Values = [...new Set(records.map((d: any) => String(d[dim2Key])))].sort();
+    const dim1Key =
+      Object.keys(records[0]).find((k) => k !== "value" && k !== dim2Key) ??
+      "province";
+    const dim1Label: Record<string, string> = {
+      province: "Province",
+      category: "Category",
+      status: "Status",
+      productGroup: "Product Group",
+    };
+    const dim1Values = [
+      ...new Set(records.map((d: any) => d[dim1Key] as string)),
+    ].sort();
+    const dim2Values = [
+      ...new Set(records.map((d: any) => String(d[dim2Key]))),
+    ].sort();
 
     const lookup: Record<string, Record<string, number>> = {};
     records.forEach((d: any) => {
@@ -920,10 +1016,21 @@ export default function App() {
     const range = maxV - minV;
 
     const MONTH_ABBR: Record<string, string> = {
-      "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun",
-      "07": "Jul", "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec",
+      "01": "Jan",
+      "02": "Feb",
+      "03": "Mar",
+      "04": "Apr",
+      "05": "May",
+      "06": "Jun",
+      "07": "Jul",
+      "08": "Aug",
+      "09": "Sep",
+      "10": "Oct",
+      "11": "Nov",
+      "12": "Dec",
     };
-    const colLabel = (v: string) => dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v;
+    const colLabel = (v: string) =>
+      dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v;
 
     return (
       <div className="flex gap-4 w-full">
@@ -934,18 +1041,23 @@ export default function App() {
                 <th className="text-gray-200 font-bold pr-3 pb-2 text-left w-32 text-sm">
                   {dim1Label[dim1Key] ?? dim1Key}
                 </th>
-                {dim2Values.map(v => (
-                  <th key={v} className="text-gray-200 font-bold pb-2 text-center px-1 text-xs min-w-[26px]">
+                {dim2Values.map((v) => (
+                  <th
+                    key={v}
+                    className="text-gray-200 font-bold pb-2 text-center px-1 text-xs min-w-[26px]"
+                  >
                     {colLabel(v)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {dim1Values.map(row => (
+              {dim1Values.map((row) => (
                 <tr key={row}>
-                  <td className="text-gray-100 font-medium pr-3 py-0.5 whitespace-nowrap text-xs">{row}</td>
-                  {dim2Values.map(col => {
+                  <td className="text-gray-100 font-medium pr-3 py-0.5 whitespace-nowrap text-xs">
+                    {row}
+                  </td>
+                  {dim2Values.map((col) => {
                     const val = lookup[row]?.[col] ?? 0;
                     const normalized = val ? (val - minV) / range : 0;
                     return (
@@ -953,7 +1065,10 @@ export default function App() {
                         <div
                           title={`${row} / ${colLabel(col)}: ${formatVal(val, agg)}`}
                           className="w-5 h-5 rounded-sm mx-auto"
-                          style={{ backgroundColor: heatColor(normalized), opacity: val ? 0.85 : 0.12 }}
+                          style={{
+                            backgroundColor: heatColor(normalized),
+                            opacity: val ? 0.85 : 0.12,
+                          }}
                         />
                       </td>
                     );
@@ -992,7 +1107,11 @@ export default function App() {
             <div className="rounded-xl border border-gray-800/60 bg-[#0d1117]">
               <ComposableMap
                 projection="geoAzimuthalEqualArea"
-                projectionConfig={{ rotate: [96, -63, 0], scale: 590, center: [6, 0] }}
+                projectionConfig={{
+                  rotate: [96, -63, 0],
+                  scale: 590,
+                  center: [6, 0],
+                }}
                 width={800}
                 height={430}
                 style={{
@@ -1193,9 +1312,8 @@ export default function App() {
       </div>
     );
   }
-
-  const isRestricted = userRole !== "admin";
-
+  // allows both roles to see dashboard and Ai assistant to request new data and see live data
+  const isRestricted = userRole !== "admin" && userRole !== "analyst";
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
@@ -1425,8 +1543,9 @@ export default function App() {
   return (
     <DashboardLayout navItems={navItems}>
       <Routes>
-        <Route path="/" element={nlAssistantPage} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/assistant" element={nlAssistantPage} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
     </DashboardLayout>

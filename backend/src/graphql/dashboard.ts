@@ -1,23 +1,41 @@
 import { sequelize } from "../../models";
 
 export const dashboardTypeDefs = `#graphql
+  type TaxSummary {
+    grossRevenue:      Float!
+    netSales:          Float!
+    totalTaxCollected: Float!
+  }
+
   type DashboardStats {
+    taxSummary:       TaxSummary!
+    yearlyRevenue:    [YearlyRevenue!]!
     monthlyRevenue:   [MonthlyRevenue!]!
     ordersByStatus:   [StatusCount!]!
     topProductGroups: [GroupRevenue!]!
     topProvinces:     [ProvinceCount!]!
     categoryRevenue:  [CategoryRevenue!]!
+    bottomProducts:   [ProductRevenue!]!
   }
 
+  type YearlyRevenue   { year: String!     revenue: Float! }
   type MonthlyRevenue  { month: String!    revenue: Float! }
   type StatusCount     { status: String!   count: Int!     }
   type GroupRevenue    { name: String!     revenue: Float! }
   type ProvinceCount   { province: String! orders: Int!    }
-  type CategoryRevenue { category: String! revenue: Float! }
+  type CategoryRevenue  { category: String! revenue: Float! }
+  type ProductRevenue   { name: String!     revenue: Float! }
 
   extend type Query {
+    categories: [String!]!
+    provinces:  [String!]!
+    statuses:   [String!]!
+    years:      [Int!]!
+
     dashboardStats(
       year: Int
+      yearFrom: Int
+      yearTo: Int
       province: String
       status: String
       category: String
@@ -27,6 +45,8 @@ export const dashboardTypeDefs = `#graphql
 
 interface DashboardStatsArgs {
   year?: number | null;
+  yearFrom?: number | null;
+  yearTo?: number | null;
   province?: string | null;
   status?: string | null;
   category?: string | null;
@@ -45,9 +65,9 @@ function hasYear(value?: number | null): value is number {
 function buildReplacements(args: DashboardStatsArgs): SqlReplacements {
   const replacements: SqlReplacements = {};
 
-  if (hasYear(args.year)) {
-    replacements.year = args.year;
-  }
+  if (hasYear(args.year))     replacements.year     = args.year;
+  if (hasYear(args.yearFrom)) replacements.yearFrom = args.yearFrom;
+  if (hasYear(args.yearTo))   replacements.yearTo   = args.yearTo;
 
   if (hasText(args.province)) {
     replacements.province = args.province.trim();
@@ -84,8 +104,9 @@ function buildOrderLevelWhere(
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
-  } else if (options.useMonthlyRevenueDefaults) {
-    conditions.push("o.createdAt >= '2023-01-01'");
+  } else if (hasYear(args.yearFrom) || hasYear(args.yearTo)) {
+    if (hasYear(args.yearFrom)) conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) >= :yearFrom");
+    if (hasYear(args.yearTo))   conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) <= :yearTo");
   }
 
   if (hasText(args.province)) {
@@ -112,12 +133,12 @@ function buildOrderLevelWhere(
   };
 }
 
-function needsOrderJoin(args: DashboardStatsArgs): boolean {
-  return hasYear(args.year) || hasText(args.status) || hasText(args.province);
+function needsOrderJoin(args: DashboardStatsArgs, applyStatusDefault = false): boolean {
+  return applyStatusDefault || hasYear(args.year) || hasYear(args.yearFrom) || hasYear(args.yearTo) || hasText(args.status) || hasText(args.province);
 }
 
-function buildItemOrderJoins(args: DashboardStatsArgs): string {
-  if (!needsOrderJoin(args)) return "";
+function buildItemOrderJoins(args: DashboardStatsArgs, applyStatusDefault = false): string {
+  if (!needsOrderJoin(args, applyStatusDefault)) return "";
 
   return `
     JOIN Orders o ON oi.orderId = o.id
@@ -125,15 +146,23 @@ function buildItemOrderJoins(args: DashboardStatsArgs): string {
   `;
 }
 
-function buildItemConditions(args: DashboardStatsArgs): string[] {
+function buildItemConditions(
+  args: DashboardStatsArgs,
+  options: { applyStatusDefault?: boolean } = {},
+): string[] {
   const conditions: string[] = [];
 
   if (hasText(args.status)) {
     conditions.push("LOWER(o.status) = LOWER(:status)");
+  } else if (options.applyStatusDefault) {
+    conditions.push("o.status IN ('paid','shipped')");
   }
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
+  } else if (hasYear(args.yearFrom) || hasYear(args.yearTo)) {
+    if (hasYear(args.yearFrom)) conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) >= :yearFrom");
+    if (hasYear(args.yearTo))   conditions.push("CAST(strftime('%Y', o.createdAt) AS INT) <= :yearTo");
   }
 
   if (hasText(args.province)) {
@@ -141,6 +170,52 @@ function buildItemConditions(args: DashboardStatsArgs): string[] {
   }
 
   return conditions;
+}
+
+async function fetchTaxSummary(
+  args: DashboardStatsArgs,
+): Promise<{ grossRevenue: number; netSales: number; totalTaxCollected: number }> {
+  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT
+      ROUND(SUM(o.subtotal + o.total), 2) as grossRevenue,
+      ROUND(SUM(o.subtotal), 2)           as netSales,
+      ROUND(SUM(o.total), 2)              as totalTaxCollected
+    FROM Orders o
+    LEFT JOIN Addresses a ON o.addressId = a.id
+    ${where}
+  `,
+    { replacements },
+  );
+
+  const row = (rows as any[])[0] ?? {};
+  return {
+    grossRevenue:      row.grossRevenue      ?? 0,
+    netSales:          row.netSales          ?? 0,
+    totalTaxCollected: row.totalTaxCollected ?? 0,
+  };
+}
+
+async function fetchYearlyRevenue(
+  args: DashboardStatsArgs,
+): Promise<{ year: string; revenue: number }[]> {
+  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT strftime('%Y', o.createdAt) as year, ROUND(SUM(o.subtotal), 2) as revenue
+    FROM Orders o
+    LEFT JOIN Addresses a ON o.addressId = a.id
+    ${where}
+    GROUP BY year
+    ORDER BY year
+    `,
+    { replacements },
+  );
+
+  return rows as { year: string; revenue: number }[];
 }
 
 async function fetchMonthlyRevenue(
@@ -156,9 +231,6 @@ async function fetchMonthlyRevenue(
       conditions.push("o.status IN ('paid','shipped')");
     }
 
-    if (!hasYear(args.year)) {
-      conditions.push("o.createdAt >= '2023-01-01'");
-    }
 
     const where = buildWhereClause(conditions);
 
@@ -223,9 +295,9 @@ async function fetchOrdersByStatus(
 async function fetchTopProductGroups(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args);
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args);
+  const orderJoins = buildItemOrderJoins(args, true);
 
   if (hasText(args.category)) {
     conditions.push(`
@@ -272,7 +344,6 @@ async function fetchTopProvinces(
     ${where}
     GROUP BY a.province
     ORDER BY orders DESC
-    LIMIT 8
   `,
     { replacements },
   );
@@ -283,14 +354,12 @@ async function fetchTopProvinces(
 async function fetchCategoryRevenue(
   args: DashboardStatsArgs,
 ): Promise<{ category: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args);
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args);
+  const orderJoins = buildItemOrderJoins(args, true);
 
   if (hasText(args.category)) {
     conditions.push("LOWER(pc.name) = LOWER(:category)");
-  } else {
-    conditions.push("pc.name IN ('shoes','apparel')");
   }
 
   const where = buildWhereClause(conditions);
@@ -313,29 +382,102 @@ async function fetchCategoryRevenue(
   return rows as { category: string; revenue: number }[];
 }
 
+async function fetchBottomProducts(
+  args: DashboardStatsArgs,
+): Promise<{ name: string; revenue: number }[]> {
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const replacements = buildReplacements(args);
+  const orderJoins = buildItemOrderJoins(args, true);
+
+  if (hasText(args.category)) {
+    conditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM ProductGroupCategories pgc
+          JOIN ProductCategories pc ON pgc.categoryId = pc.id
+          WHERE pgc.groupId = p.groupId
+            AND LOWER(pc.name) = LOWER(:category)
+        )
+      `);
+  }
+
+  const where = buildWhereClause(conditions);
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT p.name, ROUND(SUM(oi.price * oi.quantity), 2) as revenue
+    FROM OrderItems oi
+    JOIN Products p ON oi.productId = p.id
+    ${orderJoins}
+    ${where}
+    GROUP BY p.id, p.name
+    ORDER BY revenue ASC
+    LIMIT 5
+    `,
+    { replacements },
+  );
+
+  return rows as { name: string; revenue: number }[];
+}
+
 export const dashboardResolvers = {
   Query: {
+    categories: async () => {
+      const [rows] = await sequelize.query(`SELECT name FROM ProductCategories ORDER BY name`);
+      return (rows as { name: string }[]).map(r => r.name);
+    },
+
+    provinces: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT province FROM Addresses WHERE country = 'ca' AND province IS NOT NULL AND province != '' ORDER BY province`,
+      );
+      return (rows as { province: string }[]).map(r => r.province);
+    },
+
+    statuses: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT status FROM Orders WHERE status IS NOT NULL ORDER BY status`,
+      );
+      return (rows as { status: string }[]).map(r => r.status);
+    },
+
+    years: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT DISTINCT CAST(strftime('%Y', createdAt) AS INT) as year FROM Orders ORDER BY year`,
+      );
+      return (rows as { year: number }[]).map(r => r.year);
+    },
+
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
       const [
+        taxSummary,
+        yearlyRevenue,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        bottomProducts,
       ] = await Promise.all([
+        fetchTaxSummary(args),
+        fetchYearlyRevenue(args),
         fetchMonthlyRevenue(args),
         fetchOrdersByStatus(args),
         fetchTopProductGroups(args),
         fetchTopProvinces(args),
         fetchCategoryRevenue(args),
+        fetchBottomProducts(args),
       ]);
 
       return {
+        taxSummary,
+        yearlyRevenue,
         monthlyRevenue,
         ordersByStatus,
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        bottomProducts,
       };
     },
   },
