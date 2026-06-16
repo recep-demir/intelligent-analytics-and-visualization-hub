@@ -13,18 +13,27 @@ export function detectAggregation(
   question: string,
   requestedAggregation?: unknown,
 ): Aggregation {
-  if (isAggregation(requestedAggregation)) {
-    return requestedAggregation.toLowerCase() as Aggregation;
-  }
-
+  // minmax must be checked first — Gemini may return "min" when the question
+  // says "min and max", so we detect it from the question before short-circuiting.
   const q = question.toLowerCase();
-  if (/\b(avg|average|mean)\b/.test(q))        return "avg";
-  if (/\b(count|number of|how many|by orders?|orders? count)\b/.test(q)) return "count";
-  // "min and max" / "minimum and maximum" / "max and min"
   if (
     /\b(min|minimum)\b.*\b(max|maximum)\b/.test(q) ||
     /\b(max|maximum)\b.*\b(min|minimum)\b/.test(q)
   ) return "minmax";
+
+  if (isAggregation(requestedAggregation)) {
+    return requestedAggregation.toLowerCase() as Aggregation;
+  }
+  if (/\b(avg|average|mean)\b/.test(q))        return "avg";
+  // "sum of orders" / "total orders" = count of order entities, not monetary sum.
+  // Negative lookahead guards against "total order value/amount/revenue".
+  if (
+    /\b(count|number of|how many|by orders?|orders? count)\b/.test(q) ||
+    /\bsum of (?:all )?orders?\b(?!\s*(?:amount|value|revenue|price|cost|subtotal))/.test(q) ||
+    /\btotal orders?\b(?!\s*(?:amount|value|revenue|price|cost|subtotal))/.test(q) ||
+    /\b(highest|most|fewest|lowest|least|greatest)\s+orders?\b/.test(q) ||
+    /\borders?\s+(?:as|by|per|in)\b/.test(q)
+  ) return "count";
   if (/\b(min|minimum)\b/.test(q))              return "min";
   if (/\b(max|maximum)\b/.test(q))              return "max";
   return "sum";

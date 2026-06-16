@@ -84,6 +84,18 @@ function buildWhereClause(filters: Filter[]): { where: string; replacements: Rec
 }
 
 // ---------------------------------------------------------------------------
+// buildCount — returns COUNT(*) of orders matching the same filters.
+// Always uses Orders+Addresses join so it counts orders, not items/rows.
+// ---------------------------------------------------------------------------
+export function buildCount(q: ResolvedQuery): BuiltQuery {
+  const { where, replacements } = buildWhereClause(q.filters)
+  return {
+    sql: `SELECT COUNT(*) AS total FROM Orders o LEFT JOIN Addresses a ON o.addressId = a.id ${where}`.trim(),
+    replacements,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // build — the single public entry point.
 // Accepts only ResolvedQuery — normalization is structurally mandatory.
 // ---------------------------------------------------------------------------
