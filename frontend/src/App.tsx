@@ -104,6 +104,7 @@ interface ChartConfig {
   dataset: string;
   filters?: { field: string; operator: string; value: string }[];
   groupBy?: string;
+  groupBy2?: string;
   title?: string;
   aggregation?: string;
 }
@@ -179,6 +180,7 @@ function parseChartConfig(raw: any, fallbackTitle: string): ChartConfig {
   return {
     chartType: raw?.chartType ?? raw?.charttype ?? "bar",
     groupBy: raw?.groupBy ?? raw?.groupby ?? "",
+    groupBy2: raw?.groupBy2,
     dataset: raw?.dataset ?? raw?.dataSet ?? "",
     filters: raw?.filters ?? [],
     aggregation: raw?.aggregation,
@@ -222,6 +224,10 @@ function generateTitle(config: ChartConfig): string {
   if (config.chartType === "stat") return `Total ${metric}${period}`;
 
   const groupLabel = config.groupBy ? GROUP_LABELS[config.groupBy] : null;
+  if (config.chartType === "heatmap" && groupLabel) {
+    const dim2Label = config.groupBy2 === "year" ? "Year" : "Month";
+    return `${metric} by ${groupLabel} & ${dim2Label}${period}`;
+  }
   if (groupLabel) return `${metric} by ${groupLabel}${period}`;
   return `${metric}${period}`;
 }
@@ -352,7 +358,12 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-  if (!query.trim() || isLoading || (userRole !== "admin" && userRole !== "analyst")) return;
+    if (
+      !query.trim() ||
+      isLoading ||
+      (userRole !== "admin" && userRole !== "analyst")
+    )
+      return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -399,64 +410,84 @@ export default function App() {
         return;
       }
 
-        setChartData({
-          chartConfig: parseChartConfig(rawData.chartConfig, query),
-          fromCache: rawData.fromCache ?? false,
-          engine: rawData.engine,
-          latencyMs: Date.now() - fetchStart,
-          data: rawData.data,
-          message: rawData.message,
-          insights: Array.isArray(rawData.insights) ? rawData.insights : [],
-          totalOrders: rawData.totalOrders,
-        });
-      } catch (err: any) {
-        console.error("AI execution error:", err);
-        setError(err.message || "An analytics engine breakdown occurred.");
-        } finally {
-          setIsLoading(false);
-        }
-      };
+      setChartData({
+        chartConfig: parseChartConfig(rawData.chartConfig, query),
+        fromCache: rawData.fromCache ?? false,
+        engine: rawData.engine,
+        latencyMs: Date.now() - fetchStart,
+        data: rawData.data,
+        message: rawData.message,
+        insights: Array.isArray(rawData.insights) ? rawData.insights : [],
+        totalOrders: rawData.totalOrders,
+      });
+    } catch (err: any) {
+      console.error("AI execution error:", err);
+      setError(err.message || "An analytics engine breakdown occurred.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const agg = chartData?.chartConfig.aggregation;
 
   function renderPieOrDonut(records: any[], isDonut: boolean) {
     const total =
       records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
-    const GAP = 0.9;
-    const available = 100 - records.length * GAP;
-    let cumulative = 0;
-    const stopParts: string[] = [];
-    records.forEach((r: any, i: number) => {
-      const pct = ((r.value ?? 0) / total) * available;
-      const segEnd = cumulative + pct;
-      stopParts.push(
-        `${PIE_COLORS[i % PIE_COLORS.length]} ${cumulative.toFixed(2)}% ${segEnd.toFixed(2)}%`,
-      );
-      stopParts.push(
-        `transparent ${segEnd.toFixed(2)}% ${(segEnd + GAP).toFixed(2)}%`,
-      );
-      cumulative = segEnd + GAP;
+    const CX = 100,
+      CY = 100,
+      R = 88,
+      INNER_R = isDonut ? 52 : 0;
+    const GAP_DEG = 1.5; // degrees of gap between segments
+
+    // Build SVG arc paths
+    let startAngle = -Math.PI / 2; // start at top
+    const slices = records.map((r: any, i: number) => {
+      const fraction = (r.value ?? 0) / total;
+      const sweep = fraction * 2 * Math.PI - (GAP_DEG * Math.PI) / 180;
+      const endAngle = startAngle + sweep;
+      const x1 = CX + R * Math.cos(startAngle),
+        y1 = CY + R * Math.sin(startAngle);
+      const x2 = CX + R * Math.cos(endAngle),
+        y2 = CY + R * Math.sin(endAngle);
+      const xi1 = CX + INNER_R * Math.cos(startAngle),
+        yi1 = CY + INNER_R * Math.sin(startAngle);
+      const xi2 = CX + INNER_R * Math.cos(endAngle),
+        yi2 = CY + INNER_R * Math.sin(endAngle);
+      const large = sweep > Math.PI ? 1 : 0;
+      const path = isDonut
+        ? `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${INNER_R} ${INNER_R} 0 ${large} 0 ${xi1} ${yi1} Z`
+        : `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`;
+      const midAngle = startAngle + sweep / 2;
+      startAngle = endAngle + (GAP_DEG * Math.PI) / 180;
+      return {
+        path,
+        color: PIE_COLORS[i % PIE_COLORS.length],
+        midAngle,
+        fraction,
+        record: r,
+      };
     });
-    const stops = stopParts.join(", ");
-    const cutoutPx = isDonut ? 44 : 0;
-    const maskStyle = isDonut
-      ? `radial-gradient(circle ${cutoutPx}px, transparent ${cutoutPx}px, white ${cutoutPx + 1}px)`
-      : undefined;
 
     return (
       <div className="flex items-center gap-10 py-4 w-full justify-center">
-        <div className="relative w-48 h-48 flex items-center justify-center shrink-0 filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
-          <div
-            className="w-full h-full rounded-full"
-            style={{
-              background: `conic-gradient(${stops})`,
-              WebkitMaskImage: maskStyle,
-              maskImage: maskStyle,
-            }}
-          />
+        <div className="relative shrink-0" style={{ width: 200, height: 200 }}>
+          <svg viewBox="0 0 200 200" width={200} height={200}>
+            {slices.map((s, i) => (
+              <path
+                key={i}
+                d={s.path}
+                fill={s.color}
+                fillOpacity={0.9}
+                stroke="#0f172a"
+                strokeWidth={1}
+              >
+                <title>{`${s.record.name}: ${formatVal(s.record.value ?? 0, agg)} (${(s.fraction * 100).toFixed(1)}%)`}</title>
+              </path>
+            ))}
+          </svg>
           {isDonut && (
-            <div className="absolute w-28 h-28 rounded-full bg-gray-900 border border-gray-800/80 shadow-inner flex items-center justify-center">
-              <span className="text-sm font-mono text-gray-200 font-bold text-center leading-tight px-2">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-xl font-bold font-mono text-white text-center leading-tight">
                 {formatVal(total, agg)}
               </span>
             </div>
@@ -814,17 +845,241 @@ export default function App() {
 
   function renderTreemap(records: any[]) {
     if (records.length === 0) return null;
+    const sorted = [...records].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    const total = sorted.reduce((s, r) => s + (r.value ?? 0), 0) || 1;
+    const VW = 800,
+      VH = 400;
+
+    function layout(
+      items: typeof sorted,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+    ): {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      idx: number;
+      item: (typeof sorted)[0];
+    }[] {
+      if (items.length === 0) return [];
+      if (items.length === 1)
+        return [{ x, y, w, h, idx: sorted.indexOf(items[0]), item: items[0] }];
+      const sum = items.reduce((s, r) => s + (r.value ?? 0), 0);
+      let acc = 0,
+        split = 1;
+      for (let i = 0; i < items.length - 1; i++) {
+        acc += items[i].value ?? 0;
+        split = i + 1;
+        if (acc >= sum / 2) break;
+      }
+      const ratio = acc / sum;
+      const left = items.slice(0, split);
+      const right = items.slice(split);
+      if (w >= h) {
+        const lw = w * ratio;
+        return [
+          ...layout(left, x, y, lw, h),
+          ...layout(right, x + lw, y, w - lw, h),
+        ];
+      } else {
+        const lh = h * ratio;
+        return [
+          ...layout(left, x, y, w, lh),
+          ...layout(right, x, y + lh, w, h - lh),
+        ];
+      }
+    }
+
+    const GAP = 3;
+    const rects = layout(sorted, 0, 0, VW, VH);
+
     return (
-      <div className="text-center text-gray-400 py-4">
-        Treemap View Enabled ({records.length} items)
+      <div className="w-full flex items-center">
+        <svg
+          viewBox={`0 0 ${VW} ${VH}`}
+          className="w-full"
+          style={{ height: "380px" }}
+        >
+          {rects.map((r, i) => {
+            const color = PIE_COLORS[r.idx % PIE_COLORS.length];
+            const rx = r.x + GAP,
+              ry = r.y + GAP;
+            const rw = Math.max(r.w - GAP * 2, 1),
+              rh = Math.max(r.h - GAP * 2, 1);
+            const pct = (((r.item.value ?? 0) / total) * 100).toFixed(1);
+            const valStr = formatVal(r.item.value ?? 0, agg);
+            const showValue = rw > 14 && rh > 14;
+            const showLabel = rw > 48 && rh > (showValue ? 38 : 22);
+            const nameFontSize = Math.max(
+              Math.min(rw / (r.item.name.length * 0.58), rh / 3.5, 15),
+              7,
+            );
+            const valFontSize = Math.max(
+              Math.min(rw / (valStr.length * 0.62), rh / 2.2, 36),
+              8,
+            );
+            const clipId = `clip-${i}`;
+            return (
+              <g key={i}>
+                <defs>
+                  <clipPath id={clipId}>
+                    <rect x={rx} y={ry} width={rw} height={rh} rx={6} />
+                  </clipPath>
+                </defs>
+                <rect
+                  x={rx}
+                  y={ry}
+                  width={rw}
+                  height={rh}
+                  rx={6}
+                  fill={color}
+                  fillOpacity={0.22}
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.7}
+                >
+                  <title>{`${r.item.name}: ${formatVal(r.item.value ?? 0, agg)} (${pct}%)`}</title>
+                </rect>
+                <g
+                  clipPath={`url(#${clipId})`}
+                  style={{ pointerEvents: "none" }}
+                >
+                  {showLabel && (
+                    <text
+                      x={rx + rw / 2}
+                      y={showValue ? ry + rh * 0.32 : ry + rh / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="rgba(255,255,255,0.85)"
+                      fontSize={nameFontSize}
+                      fontWeight="600"
+                    >
+                      {r.item.name}
+                    </text>
+                  )}
+                  {showValue && (
+                    <text
+                      x={rx + rw / 2}
+                      y={showLabel ? ry + rh * 0.65 : ry + rh / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill="white"
+                      fontSize={valFontSize}
+                      fontWeight="800"
+                    >
+                      {valStr}
+                    </text>
+                  )}
+                </g>
+              </g>
+            );
+          })}
+        </svg>
       </div>
     );
   }
 
   function renderHeatmap(records: any[]) {
     if (records.length === 0) return null;
+
+    const dim2Key = "month" in records[0] ? "month" : "year";
+    const dim1Key =
+      Object.keys(records[0]).find((k) => k !== "value" && k !== dim2Key) ??
+      "province";
+    const dim1Label: Record<string, string> = {
+      province: "Province",
+      category: "Category",
+      status: "Status",
+      productGroup: "Product Group",
+    };
+    const dim1Values = [
+      ...new Set(records.map((d: any) => d[dim1Key] as string)),
+    ].sort();
+    const dim2Values = [
+      ...new Set(records.map((d: any) => String(d[dim2Key]))),
+    ].sort();
+
+    const lookup: Record<string, Record<string, number>> = {};
+    records.forEach((d: any) => {
+      const p = d[dim1Key] as string;
+      const t = String(d[dim2Key]);
+      if (!lookup[p]) lookup[p] = {};
+      lookup[p][t] = Number(d.value) || 0;
+    });
+
+    const allValues = records.map((d: any) => Number(d.value) || 0);
+    const minV = Math.min(...allValues);
+    const maxV = Math.max(...allValues, minV + 1);
+    const range = maxV - minV;
+
+    const MONTH_ABBR: Record<string, string> = {
+      "01": "Jan",
+      "02": "Feb",
+      "03": "Mar",
+      "04": "Apr",
+      "05": "May",
+      "06": "Jun",
+      "07": "Jul",
+      "08": "Aug",
+      "09": "Sep",
+      "10": "Oct",
+      "11": "Nov",
+      "12": "Dec",
+    };
+    const colLabel = (v: string) =>
+      dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v;
+
     return (
-      <div className="text-center text-gray-400 py-4">Heatmap View Enabled</div>
+      <div className="flex gap-4 w-full">
+        <div className="flex-1 overflow-x-auto">
+          <table className="w-full text-xs font-mono border-collapse">
+            <thead>
+              <tr>
+                <th className="text-gray-200 font-bold pr-3 pb-2 text-left w-32 text-sm">
+                  {dim1Label[dim1Key] ?? dim1Key}
+                </th>
+                {dim2Values.map((v) => (
+                  <th
+                    key={v}
+                    className="text-gray-200 font-bold pb-2 text-center px-1 text-xs min-w-[26px]"
+                  >
+                    {colLabel(v)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dim1Values.map((row) => (
+                <tr key={row}>
+                  <td className="text-gray-100 font-medium pr-3 py-0.5 whitespace-nowrap text-xs">
+                    {row}
+                  </td>
+                  {dim2Values.map((col) => {
+                    const val = lookup[row]?.[col] ?? 0;
+                    const normalized = val ? (val - minV) / range : 0;
+                    return (
+                      <td key={col} className="py-0.5 px-0.5 text-center">
+                        <div
+                          title={`${row} / ${colLabel(col)}: ${formatVal(val, agg)}`}
+                          className="w-5 h-5 rounded-sm mx-auto"
+                          style={{
+                            backgroundColor: heatColor(normalized),
+                            opacity: val ? 0.85 : 0.12,
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
+      </div>
     );
   }
 
@@ -852,7 +1107,11 @@ export default function App() {
             <div className="rounded-xl border border-gray-800/60 bg-[#0d1117]">
               <ComposableMap
                 projection="geoAzimuthalEqualArea"
-                projectionConfig={{ rotate: [96, -63, 0], scale: 590 }}
+                projectionConfig={{
+                  rotate: [96, -63, 0],
+                  scale: 590,
+                  center: [6, 0],
+                }}
                 width={800}
                 height={430}
                 style={{
@@ -1053,7 +1312,7 @@ export default function App() {
       </div>
     );
   }
-// allows both roles to see dashboard and Ai assistant to request new data and see live data
+  // allows both roles to see dashboard and Ai assistant to request new data and see live data
   const isRestricted = userRole !== "admin" && userRole !== "analyst";
   if (!token) {
     return (
@@ -1263,9 +1522,11 @@ export default function App() {
                 </div>
               )}
               {chartData.totalOrders != null && chartData.totalOrders > 0 && (
-                <p className="text-gray-500 text-[10px] font-mono mt-2 text-center">
-                  Based on {chartData.totalOrders.toLocaleString()} orders
-                </p>
+                <div className="flex justify-center mt-3">
+                  <span className="text-white text-[12px] font-mono">
+                    Based on {chartData.totalOrders.toLocaleString()} orders
+                  </span>
+                </div>
               )}
             </div>
           )}

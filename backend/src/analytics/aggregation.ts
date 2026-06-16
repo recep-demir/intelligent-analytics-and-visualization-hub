@@ -28,11 +28,10 @@ export function detectAggregation(
   // "sum of orders" / "total orders" = count of order entities, not monetary sum.
   // Negative lookahead guards against "total order value/amount/revenue".
   if (
-    /\b(count|number of|how many|by orders?|orders? count)\b/.test(q) ||
+    /\b(count|number of|how many|orders? count)\b/.test(q) ||
     /\bsum of (?:all )?orders?\b(?!\s*(?:amount|value|revenue|price|cost|subtotal))/.test(q) ||
     /\btotal orders?\b(?!\s*(?:amount|value|revenue|price|cost|subtotal))/.test(q) ||
-    /\b(highest|most|fewest|lowest|least|greatest)\s+orders?\b/.test(q) ||
-    /\borders?\s+(?:as|by|per|in)\b/.test(q)
+    /\b(highest|most|fewest|lowest|least|greatest)\s+orders?\b/.test(q)
   ) return "count";
   if (/\b(min|minimum)\b/.test(q))              return "min";
   if (/\b(max|maximum)\b/.test(q))              return "max";
