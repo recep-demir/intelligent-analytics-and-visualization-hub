@@ -77,8 +77,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   });
 
   const vals  = Object.values(lookup);
-  const maxV  = Math.max(...vals, 1);
-  const minV  = Math.min(...vals);
+  const maxV  = vals.length ? Math.max(...vals) : 1;
+  const minV  = vals.length ? Math.min(...vals) : 0;
   const range = maxV - minV || 1;
 
   const MARITIMES = ["New Brunswick", "Nova Scotia", "Prince Edward Island", "Newfoundland and Labrador", "Newfoundland"];

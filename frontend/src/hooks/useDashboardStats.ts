@@ -33,7 +33,6 @@ function buildQuery(filters: DashboardFilters): string {
       dashboardStats${argStr} {
         taxSummary       { grossRevenue netSales totalTaxCollected }
         yearlyRevenue    { year revenue }
-        monthlyRevenue   { month revenue }
         ordersByStatus   { status count }
         topProductGroups { name revenue }
         topProvinces     { province orders }
@@ -75,7 +74,7 @@ export function useDashboardStats(filters: DashboardFilters = {}): UseDashboardS
         }
 
         const stats = json.data?.dashboardStats;
-        const REQUIRED_FIELDS = ["monthlyRevenue", "ordersByStatus", "topProductGroups", "topProvinces", "categoryRevenue"] as const;
+        const REQUIRED_FIELDS = ["ordersByStatus", "topProductGroups", "topProvinces", "categoryRevenue"] as const;
         const missing = REQUIRED_FIELDS.filter(f => !Array.isArray(stats?.[f]));
         if (stats?.taxSummary == null) missing.push("taxSummary" as never);
         if (missing.length) {

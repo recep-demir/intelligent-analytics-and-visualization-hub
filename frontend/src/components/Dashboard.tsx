@@ -86,7 +86,13 @@ export function Dashboard() {
   function set(key: keyof DashboardFilters, raw: string) {
     const isYear = key === "yearFrom" || key === "yearTo";
     const value = raw === "" ? null : isYear ? Number(raw) : raw;
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => {
+      const next = { ...prev, [key]: value };
+      if (next.yearFrom && next.yearTo && next.yearFrom > next.yearTo) {
+        next.yearTo = next.yearFrom;
+      }
+      return next;
+    });
   }
 
   function clearFilters() {

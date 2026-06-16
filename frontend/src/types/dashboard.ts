@@ -9,7 +9,6 @@ export interface ProductRevenue  { name: string;     revenue: number }
 export interface DashboardStats {
   taxSummary:       TaxSummary;
   yearlyRevenue:    YearlyRevenue[];
-  monthlyRevenue:   MonthlyRevenue[];
   ordersByStatus:   StatusCount[];
   topProductGroups: GroupRevenue[];
   topProvinces:     ProvinceCount[];
