@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Routes, Route } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import {
   ComposableMap,
   Geographies,
@@ -14,8 +14,8 @@ import "./index.css";
 const CANADA_GEO = "/canada-provinces.json";
 
 const NAV_ITEMS = [
-  { id: "assistant", label: "AI Assistant", path: "/" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
+  { id: "assistant", label: "AI Assistant", path: "/assistant" },
 ];
 
 type Capital = {
@@ -312,6 +312,9 @@ export default function App() {
       // 👤 3. Execute dynamic cryptographic role verification lifecycle
       decodeAndSetUserRole(data.token);
 
+      // 📊 Push browser URL straight to the dashboard metrics page on login success
+      window.location.href = "/dashboard";
+
       // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
       setEmail("");
       setPassword("");
@@ -349,7 +352,7 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading || userRole !== "admin") return;
+  if (!query.trim() || isLoading || (userRole !== "admin" && userRole !== "analyst")) return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -396,32 +399,23 @@ export default function App() {
         return;
       }
 
-      setChartData({
-        chartConfig: parseChartConfig(rawData.chartConfig, query),
-        fromCache: rawData.fromCache ?? false,
-        engine: rawData.engine,
-        latencyMs: Date.now() - fetchStart,
-        data: rawData.data,
-        message: rawData.message,
-        insights: Array.isArray(rawData.insights) ? rawData.insights : [],
-        totalOrders: rawData.totalOrders,
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          "Failed to pull analytical insight data from analytical engine.",
-        );
-      }
-
-      const payload = await response.json();
-      setChartData(payload);
-    } catch (err: any) {
-      console.error("AI execution error:", err);
-      setError(err.message || "An analytics engine breakdown occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setChartData({
+          chartConfig: parseChartConfig(rawData.chartConfig, query),
+          fromCache: rawData.fromCache ?? false,
+          engine: rawData.engine,
+          latencyMs: Date.now() - fetchStart,
+          data: rawData.data,
+          message: rawData.message,
+          insights: Array.isArray(rawData.insights) ? rawData.insights : [],
+          totalOrders: rawData.totalOrders,
+        });
+      } catch (err: any) {
+        console.error("AI execution error:", err);
+        setError(err.message || "An analytics engine breakdown occurred.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
   const agg = chartData?.chartConfig.aggregation;
 
@@ -1059,9 +1053,8 @@ export default function App() {
       </div>
     );
   }
-
-  const isRestricted = userRole !== "admin";
-
+// allows both roles to see dashboard and Ai assistant to request new data and see live data
+  const isRestricted = userRole !== "admin" && userRole !== "analyst";
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
@@ -1289,8 +1282,9 @@ export default function App() {
   return (
     <DashboardLayout navItems={navItems}>
       <Routes>
-        <Route path="/" element={nlAssistantPage} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/assistant" element={nlAssistantPage} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
     </DashboardLayout>
