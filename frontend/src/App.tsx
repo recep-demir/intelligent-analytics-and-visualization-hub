@@ -352,7 +352,7 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading || userRole !== "admin") return;
+  if (!query.trim() || isLoading || (userRole !== "admin" && userRole !== "analyst")) return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -399,32 +399,23 @@ export default function App() {
         return;
       }
 
-      setChartData({
-        chartConfig: parseChartConfig(rawData.chartConfig, query),
-        fromCache: rawData.fromCache ?? false,
-        engine: rawData.engine,
-        latencyMs: Date.now() - fetchStart,
-        data: rawData.data,
-        message: rawData.message,
-        insights: Array.isArray(rawData.insights) ? rawData.insights : [],
-        totalOrders: rawData.totalOrders,
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          "Failed to pull analytical insight data from analytical engine.",
-        );
-      }
-
-      const payload = await response.json();
-      setChartData(payload);
-    } catch (err: any) {
-      console.error("AI execution error:", err);
-      setError(err.message || "An analytics engine breakdown occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setChartData({
+          chartConfig: parseChartConfig(rawData.chartConfig, query),
+          fromCache: rawData.fromCache ?? false,
+          engine: rawData.engine,
+          latencyMs: Date.now() - fetchStart,
+          data: rawData.data,
+          message: rawData.message,
+          insights: Array.isArray(rawData.insights) ? rawData.insights : [],
+          totalOrders: rawData.totalOrders,
+        });
+      } catch (err: any) {
+        console.error("AI execution error:", err);
+        setError(err.message || "An analytics engine breakdown occurred.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
   const agg = chartData?.chartConfig.aggregation;
 
@@ -1062,9 +1053,8 @@ export default function App() {
       </div>
     );
   }
-
-  const isRestricted = userRole !== "admin";
-
+// allows both roles to see dashboard and Ai assistant to request new data and see live data
+  const isRestricted = userRole !== "admin" && userRole !== "analyst";
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
