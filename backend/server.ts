@@ -206,6 +206,7 @@ export async function startServer(): Promise<void> {
           chartConfig: {
             chartType: resolved.chartType,
             groupBy: resolved.groupBy,
+            groupBy2: resolved.groupBy2,
             filters: resolved.filters,
             dataset: "Orders",
             aggregation: resolved.aggregation,
