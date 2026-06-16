@@ -15,6 +15,7 @@ import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
+import { useCategories } from "../hooks/useCategories";
 import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
@@ -75,7 +76,6 @@ function formatCurrency(value: number): string {
 const YEARS      = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
 const PROVINCES  = ["Alberta","British Columbia","Manitoba","New Brunswick","Newfoundland and Labrador","Nova Scotia","Ontario","Prince Edward Island","Quebec","Saskatchewan"];
 const STATUSES   = ["pending","paid","shipped","cancelled","refunded"];
-const CATEGORIES = ["shoes","apparel"];
 
 const SELECT_CLS = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
 
@@ -84,6 +84,7 @@ export function Dashboard() {
     yearFrom: null, yearTo: null, province: null, status: null, category: null,
   });
   const { data, loading, error } = useDashboardStats(filters);
+  const categories = useCategories();
 
   function set(key: keyof DashboardFilters, raw: string) {
     const isYear = key === "yearFrom" || key === "yearTo";
@@ -228,7 +229,7 @@ export function Dashboard() {
 
         <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
           <option value="">All categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminPanel } from "./components/AdminPanel";
 import {
   ComposableMap,
@@ -14,8 +14,8 @@ import "./index.css";
 const CANADA_GEO = "/canada-provinces.json";
 
 const NAV_ITEMS = [
-  { id: "assistant", label: "AI Assistant", path: "/" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
+  { id: "assistant", label: "AI Assistant", path: "/assistant" },
 ];
 
 const PROVINCE_CAPITALS: {
@@ -1265,8 +1265,9 @@ export default function App() {
   return (
     <DashboardLayout navItems={dynamicNavItems}>
       <Routes>
-        <Route path="/" element={nlAssistantPage} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/assistant" element={nlAssistantPage} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
     </DashboardLayout>

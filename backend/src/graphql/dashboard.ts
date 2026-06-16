@@ -27,6 +27,8 @@ export const dashboardTypeDefs = `#graphql
   type ProductRevenue   { name: String!     revenue: Float! }
 
   extend type Query {
+    categories: [String!]!
+
     dashboardStats(
       year: Int
       yearFrom: Int
@@ -400,6 +402,13 @@ async function fetchBottomProducts(
 
 export const dashboardResolvers = {
   Query: {
+    categories: async () => {
+      const [rows] = await sequelize.query(
+        `SELECT name FROM ProductCategories ORDER BY name`,
+      );
+      return (rows as { name: string }[]).map(r => r.name);
+    },
+
     dashboardStats: async (_parent: unknown, args: DashboardStatsArgs) => {
       const [
         taxSummary,
