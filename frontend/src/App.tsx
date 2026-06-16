@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AdminPanel } from "./components/AdminPanel";
 import {
   ComposableMap,
   Geographies,
