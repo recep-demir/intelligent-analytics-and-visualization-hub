@@ -16,7 +16,7 @@ import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
 import { useFilterOptions } from "../hooks/useFilterOptions";
-import type { KpiData, TaxSummary, ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
+import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 
 ChartJS.register(
@@ -52,22 +52,6 @@ function horizontalBarOptions(title: string, xLabel = "", yLabel = "") {
   return { ...baseChartOptions(title, xLabel, yLabel), indexAxis: "y" as const };
 }
 
-function computeKpis(stats: ReturnType<typeof useDashboardStats>["data"]): KpiData {
-  if (!stats) return { totalRevenue: 0, completedOrders: 0, avgOrderValue: 0, conversionRate: 0 };
-
-  const totalRevenue = stats.monthlyRevenue.reduce((s, r) => s + r.revenue, 0);
-  const completedOrders = stats.ordersByStatus
-    .filter(s => s.status === "paid" || s.status === "shipped")
-    .reduce((s, r) => s + r.count, 0);
-  const totalOrders = stats.ordersByStatus.reduce((s, r) => s + r.count, 0);
-
-  return {
-    totalRevenue,
-    completedOrders,
-    avgOrderValue:  completedOrders > 0 ? totalRevenue / completedOrders : 0,
-    conversionRate: totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0,
-  };
-}
 
 function formatCurrency(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
@@ -101,7 +85,6 @@ export function Dashboard() {
 
   const isFiltered = Object.values(filters).some(v => v != null);
 
-  const kpis = useMemo(() => computeKpis(data), [data]);
 
   const revenueChartTitle = useMemo(() => {
     if (filters.yearFrom && filters.yearTo) return `Yearly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
