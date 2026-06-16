@@ -312,6 +312,9 @@ export default function App() {
       // 👤 3. Execute dynamic cryptographic role verification lifecycle
       decodeAndSetUserRole(data.token);
 
+      // 📊 Push browser URL straight to the dashboard metrics page on login success
+      window.location.href = "/dashboard";
+
       // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
       setEmail("");
       setPassword("");
