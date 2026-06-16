@@ -1,16 +1,4 @@
 import { useState, useMemo } from "react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
@@ -18,39 +6,7 @@ import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardS
 import { useFilterOptions } from "../hooks/useFilterOptions";
 import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
-
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, Title, Tooltip, Legend, Filler,
-);
-
-const AXIS_TITLE_STYLE = { display: true, color: "#64748b", font: { size: 11 } };
-
-function baseChartOptions(title: string, xLabel = "", yLabel = "") {
-  return {
-    responsive: true,
-    plugins: {
-      legend: { display: false },
-      title: { display: true, text: title, color: "#e2e8f0", font: { size: 14 } },
-    },
-    scales: {
-      x: {
-        ticks: { color: "#94a3b8" },
-        grid:  { color: "#1e293b" },
-        title: { ...AXIS_TITLE_STYLE, text: xLabel },
-      },
-      y: {
-        ticks: { color: "#94a3b8" },
-        grid:  { color: "#1e293b" },
-        title: { ...AXIS_TITLE_STYLE, text: yLabel },
-      },
-    },
-  };
-}
-
-function horizontalBarOptions(title: string, xLabel = "", yLabel = "") {
-  return { ...baseChartOptions(title, xLabel, yLabel), indexAxis: "y" as const };
-}
+import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
 
 
 function formatCurrency(value: number): string {
