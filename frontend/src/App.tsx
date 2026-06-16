@@ -349,7 +349,7 @@ export default function App() {
   // 🤖 Dynamic Natural Language AI Processing Core
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim() || isLoading || userRole !== "admin") return;
+    if (!query.trim() || isLoading || (userRole !== "admin" && userRole !== "analyst")) return;
 
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -1060,7 +1060,7 @@ export default function App() {
     );
   }
 
-  const isRestricted = userRole !== "admin";
+  const isRestricted = userRole !== "admin" && userRole !== "analyst";
 
   if (!token) {
     return (
