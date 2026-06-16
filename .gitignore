@@ -23,5 +23,7 @@ Thumbs.db
 .idea/
 
 # SQLite database file
-*.db
 *.sqlite
+*.sqlite3
+*.db
+database.sqlite
