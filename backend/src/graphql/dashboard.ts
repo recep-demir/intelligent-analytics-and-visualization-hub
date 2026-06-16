@@ -133,12 +133,12 @@ function buildOrderLevelWhere(
   };
 }
 
-function needsOrderJoin(args: DashboardStatsArgs): boolean {
-  return hasYear(args.year) || hasYear(args.yearFrom) || hasYear(args.yearTo) || hasText(args.status) || hasText(args.province);
+function needsOrderJoin(args: DashboardStatsArgs, applyStatusDefault = false): boolean {
+  return applyStatusDefault || hasYear(args.year) || hasYear(args.yearFrom) || hasYear(args.yearTo) || hasText(args.status) || hasText(args.province);
 }
 
-function buildItemOrderJoins(args: DashboardStatsArgs): string {
-  if (!needsOrderJoin(args)) return "";
+function buildItemOrderJoins(args: DashboardStatsArgs, applyStatusDefault = false): string {
+  if (!needsOrderJoin(args, applyStatusDefault)) return "";
 
   return `
     JOIN Orders o ON oi.orderId = o.id
@@ -146,11 +146,16 @@ function buildItemOrderJoins(args: DashboardStatsArgs): string {
   `;
 }
 
-function buildItemConditions(args: DashboardStatsArgs): string[] {
+function buildItemConditions(
+  args: DashboardStatsArgs,
+  options: { applyStatusDefault?: boolean } = {},
+): string[] {
   const conditions: string[] = [];
 
   if (hasText(args.status)) {
     conditions.push("LOWER(o.status) = LOWER(:status)");
+  } else if (options.applyStatusDefault) {
+    conditions.push("o.status IN ('paid','shipped')");
   }
 
   if (hasYear(args.year)) {
@@ -290,9 +295,9 @@ async function fetchOrdersByStatus(
 async function fetchTopProductGroups(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args);
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args);
+  const orderJoins = buildItemOrderJoins(args, true);
 
   if (hasText(args.category)) {
     conditions.push(`
@@ -339,7 +344,6 @@ async function fetchTopProvinces(
     ${where}
     GROUP BY a.province
     ORDER BY orders DESC
-    LIMIT 8
   `,
     { replacements },
   );
@@ -350,9 +354,9 @@ async function fetchTopProvinces(
 async function fetchCategoryRevenue(
   args: DashboardStatsArgs,
 ): Promise<{ category: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args);
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args);
+  const orderJoins = buildItemOrderJoins(args, true);
 
   if (hasText(args.category)) {
     conditions.push("LOWER(pc.name) = LOWER(:category)");
@@ -381,9 +385,22 @@ async function fetchCategoryRevenue(
 async function fetchBottomProducts(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args);
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args);
+  const orderJoins = buildItemOrderJoins(args, true);
+
+  if (hasText(args.category)) {
+    conditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM ProductGroupCategories pgc
+          JOIN ProductCategories pc ON pgc.categoryId = pc.id
+          WHERE pgc.groupId = p.groupId
+            AND LOWER(pc.name) = LOWER(:category)
+        )
+      `);
+  }
+
   const where = buildWhereClause(conditions);
 
   const [rows] = await sequelize.query(
