@@ -13,7 +13,7 @@ import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
 import { LocalEngine } from "./src/ai/engines/local";
 import { normalize } from "./src/ai/normalizer";
-import { build, buildCount } from "./src/sql/queryBuilder";
+import { build, buildCount, buildRankQuery, buildTopNSeriesQuery } from "./src/sql/queryBuilder";
 import { generateInsights } from "./src/ai/insights";
 import { dashboardTypeDefs, dashboardResolvers } from "./src/graphql/dashboard";
 import { authRouter } from "./src/auth/authRoutes";
@@ -161,6 +161,27 @@ export async function startServer(): Promise<void> {
         // Step 3 — Normalize chart config into a resolved query
         const resolved = normalize(aiResult.chartConfig, question);
 
+        // Step 4 — Reject dual-metric requests on incompatible chart types
+        if (resolved.metric === "both" && ["heatmap", "treemap", "map", "pie", "donut"].includes(resolved.chartType)) {
+          const suggestions: Record<string, string> = {
+            heatmap: "show me revenue and taxes by province as a bar chart",
+            treemap: "compare revenue and taxes by province",
+            map:     "show me revenue and taxes by province as a bar chart",
+            pie:     "show me revenue and taxes by province as a bar chart",
+            donut:   "show me revenue and taxes by province as a bar chart",
+          };
+          const typeNames: Record<string, string> = {
+            heatmap: "Heatmaps", treemap: "Treemaps", map: "Maps",
+            pie: "Pie charts", donut: "Donut charts",
+          };
+          return res.status(200).json({
+            chartConfig: { chartType: "bar", filters: [], groupBy: "province", dataset: "Orders" },
+            fromCache: false,
+            data: [],
+            message: `${typeNames[resolved.chartType]} can only display one metric at a time — showing revenue and taxes simultaneously doesn't work on this chart type. Try: "${suggestions[resolved.chartType]}"`,
+          });
+        }
+
         // Step 4 — Reject unrecognized queries
         if (resolved.groupBy === "none") {
           return res.status(200).json({
@@ -171,21 +192,36 @@ export async function startServer(): Promise<void> {
           });
         }
 
-        // Step 4 — Build SQL from the resolved query
-        const { sql, replacements } = build(resolved);
-        const { sql: countSql, replacements: countReplacements } = buildCount(resolved);
-
-        // Step 5 — Execute SQL (main query + order count in parallel)
+        // Step 4 + 5 — Build and execute SQL
         let data: any[] = [];
         let totalOrders = 0;
 
         try {
-          const [[rows], [countRows]] = await Promise.all([
-            sequelize.query(sql, { replacements }),
-            sequelize.query(countSql, { replacements: countReplacements }),
-          ]);
-          data = rows as any[];
-          totalOrders = (countRows as any[])[0]?.total ?? 0;
+          if (resolved.seriesKey && resolved.limitIsExplicit) {
+            // Two-step: rank the top N items, then query their time-series in parallel with count
+            const rankQ = buildRankQuery(resolved);
+            const [rankRows] = await sequelize.query(rankQ.sql, { replacements: rankQ.replacements });
+            const topNames = (rankRows as any[]).map((r: any) => String(r.name));
+
+            const seriesQ = buildTopNSeriesQuery(resolved, topNames);
+            const countQ  = buildCount(resolved);
+            const [[seriesRows], [countRows]] = await Promise.all([
+              sequelize.query(seriesQ.sql, { replacements: seriesQ.replacements }),
+              sequelize.query(countQ.sql,  { replacements: countQ.replacements }),
+            ]);
+            data        = seriesRows as any[];
+            totalOrders = (countRows as any[])[0]?.total ?? 0;
+          } else {
+            // Single query path
+            const { sql, replacements } = build(resolved);
+            const countQ = buildCount(resolved);
+            const [[rows], [countRows]] = await Promise.all([
+              sequelize.query(sql, { replacements }),
+              sequelize.query(countQ.sql, { replacements: countQ.replacements }),
+            ]);
+            data        = rows as any[];
+            totalOrders = (countRows as any[])[0]?.total ?? 0;
+          }
         } catch (dbError) {
           console.error("⚠️ SQL error:", dbError);
         }
@@ -210,6 +246,7 @@ export async function startServer(): Promise<void> {
             filters: resolved.filters,
             dataset: "Orders",
             aggregation: resolved.aggregation,
+            ...(resolved.metric ? { metric: resolved.metric } : {}),
           },
           fromCache: aiResult.fromCache,
           engine: aiResult.engine,
