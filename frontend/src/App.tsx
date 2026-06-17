@@ -9,6 +9,7 @@ import {
 import { DashboardLayout } from "./components/DashboardLayout";
 import { Dashboard } from "./components/Dashboard";
 import { AdminPanel } from "./components/AdminPanel";
+import { SharedDashboardView } from "./components/SharedDashboardView";
 import "./index.css";
 import { Bar, Line, Pie, Doughnut, Chart } from "react-chartjs-2";
 import { CHART_COLORS } from "./constants/chartTheme";
@@ -28,10 +29,6 @@ type Capital = {
   anchor: "middle" | "start" | "end";
 };
 
-// Main map — largest/most recognizable city per province (NOT provincial capitals — Vancouver, Calgary,
-// and Montréal are used instead of Victoria, Edmonton, and Quebec City for better geographic orientation).
-// lx/ly push labels into open ocean/margin space; nearby cities staggered vertically to avoid overlap.
-// Iqaluit routes DOWN to avoid being hidden under the Maritimes inset box (absolute-positioned overlay).
 const PROVINCE_MARKERS: Capital[] = [
   {
     city: "Vancouver",
@@ -857,7 +854,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 export default function App() {
   console.log("Registered map markers module:", Marker);
   const [token, setToken] = useState<string | null>(
-    localStorage.getItem("token"),
+    sessionStorage.getItem("token"),
   );
   const [userRole, setUserRole] = useState<string>(getRoleFromToken(token));
   const [email, setEmail] = useState("");
@@ -912,15 +909,19 @@ export default function App() {
       const data = await response.json();
 
       // 💾 2. Securely persist authentication credentials in local state variables
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      sessionStorage.setItem("token", data.token);
+      sessionStorage.setItem("user", JSON.stringify(data.user));
       setToken(data.token);
 
       // 👤 3. Execute dynamic cryptographic role verification lifecycle
       decodeAndSetUserRole(data.token);
 
-      // 📊 Push browser URL straight to the dashboard metrics page on login success
-      window.location.href = "/dashboard";
+      // Push browser URL straight to the dashboard metrics page on login success
+      // After login, return to the page the user was on (handles /share/:id correctly)
+      const returnTo = window.location.pathname !== "/"
+        ? window.location.pathname
+        : "/dashboard";
+      window.location.href = returnTo;
 
       // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
       setEmail("");
@@ -936,7 +937,7 @@ export default function App() {
   const handleLogout = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       await fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -947,8 +948,8 @@ export default function App() {
         err,
       );
     } finally {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("user");
       setToken(null);
       setUserRole("viewer");
       setChartData(null);
@@ -976,7 +977,7 @@ export default function App() {
     const fetchStart = Date.now();
     try {
       const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const response = await fetch(`${API_URL}/api/ai/query`, {
         method: "POST",
         headers: {
@@ -1033,13 +1034,13 @@ export default function App() {
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl flex flex-col items-center">
-          <div className="mb-6 text-center">
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">
-              Elio Tax Dashboard
-            </h1>
-            <p className="text-gray-400 text-sm font-mono">
-              Enterprise Tax Intelligence Hub
+          <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl px-10 py-8 shadow-2xl flex flex-col items-center">          <div className="mb-6 text-center flex flex-col items-center gap-2">
+            <svg width="200" height="55" viewBox="0 0 160 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="30" fontFamily="Georgia, 'Times New Roman', serif" fontSize="35" fill="#6abf70" fontWeight="600" letterSpacing="-0.5">elio</text>
+              <text x="66" y="30" fontFamily="'Arial Black', Arial, sans-serif" fontSize="45" fill="#ffffff" fontWeight="900">Tax</text>
+            </svg>
+            <p className="text-gray-200 text-xs font-mono tracking-widest uppercase">
+              Intelligent Analytics and Visualization Hub
             </p>
           </div>
 
@@ -1049,23 +1050,22 @@ export default function App() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="w-full space-y-4">
+        <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
             <div>
-              <label className="block text-xs font-mono uppercase text-gray-400 mb-1.5">
+              <label className="block text-xs font-mono uppercase text-gray-300 mb-1.5">
                 Corporate Email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder="name@elio-tax.com"
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500"
                 required
-                // Add explicit ref-focus or clear mechanisms here if demanded by QA lifecycle
               />
             </div>
             <div>
-              <label className="block text-xs font-mono uppercase text-gray-400 mb-1.5">
+              <label className="block text-xs font-mono uppercase text-gray-300 mb-1.5">
                 Password
               </label>
               <input
@@ -1088,24 +1088,36 @@ export default function App() {
       </div>
     );
   }
-
-  const nlAssistantPage = (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-6">
-      <div className="mb-4 self-end flex items-center gap-4">
-        <span className="text-xs font-mono bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-lg text-gray-400">
-          Role: <strong className="text-blue-400 uppercase">{userRole}</strong>
-        </span>
-        <button
-          onClick={handleLogout}
-          className="text-xs font-mono text-red-400 hover:text-red-300 bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-lg"
-        >
-          ➔ Log Out
-        </button>
+  if (userRole === 'viewer' && !window.location.pathname.startsWith('/share/')) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl flex flex-col items-center gap-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-blue-900/40 border border-blue-700/50 flex items-center justify-center text-2xl">
+            🔗
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white mb-2">Share Link Required</h2>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Your account has viewer access. You can only view dashboards that have been shared with you directly via a link.
+            </p>
+            <p className="text-gray-500 text-xs mt-3 font-mono">
+              Ask an analyst or admin to share a dashboard link with you.
+            </p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-xs font-mono text-red-400 hover:text-red-300 bg-gray-800 border border-gray-700 px-4 py-2 rounded-lg"
+          >
+            ➔ Log Out
+          </button>
+        </div>
       </div>
-
-      <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col justify-center items-center">
-        <h1 className="text-3xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-          Elio Tax AI Assistant
+    );
+  }
+  const nlAssistantPage = (
+  <div className="h-full bg-gray-900 text-gray-100 flex flex-col px-6 pb-4 pt-2 overflow-auto">      
+  <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col items-center pt-4 pb-4">       
+  <h1 className="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">          Elio Tax AI Assistant
         </h1>
 
         {isRestricted && (
@@ -1116,7 +1128,7 @@ export default function App() {
           </div>
         )}
 
-        <form onSubmit={handleSearch} className="w-full flex gap-3 mb-8">
+      <form onSubmit={handleSearch} className="w-full flex gap-3 mb-4">
           <input
             type="text"
             value={query}
@@ -1138,8 +1150,7 @@ export default function App() {
           </button>
         </form>
 
-        <div className="w-full min-h-[380px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
-          {isLoading && (
+        <div className="w-full flex-1 min-h-[320px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">          {isLoading && (
             <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full" />
           )}
           {error && !isLoading && (
@@ -1230,13 +1241,19 @@ export default function App() {
   }
 
   return (
-    <DashboardLayout navItems={navItems}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/assistant" element={nlAssistantPage} />
-        <Route path="/admin" element={<AdminPanel />} />
-      </Routes>
-    </DashboardLayout>
+    <Routes>
+      <Route path="/share/:id" element={<SharedDashboardView />} />
+      <Route
+        path="/*"
+        element={
+          <DashboardLayout navItems={navItems} userRole={userRole} onLogout={handleLogout}><Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard canShare={userRole === "analyst" || userRole === "admin"} />} />
+              <Route path="/assistant" element={nlAssistantPage} />
+              <Route path="/admin" element={userRole === "admin" ? <AdminPanel /> : <Navigate to="/dashboard" replace />} /></Routes>
+          </DashboardLayout>
+        }
+      />
+    </Routes>
   );
 }
