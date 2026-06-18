@@ -98,10 +98,8 @@ function buildOrderLevelWhere(
   const replacements = buildReplacements(args);
 
   if (hasText(args.status)) {
-    conditions.push("LOWER(o.status) = LOWER(:status)");
-  } else if (options.useMonthlyRevenueDefaults) {
-    conditions.push("o.status IN ('paid','shipped')");
-  }
+  conditions.push("LOWER(o.status) = LOWER(:status)");
+}
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
@@ -228,9 +226,7 @@ async function fetchMonthlyRevenue(
 
     conditions.push("LOWER(pc.name) = LOWER(:category)");
 
-    if (!hasText(args.status)) {
-      conditions.push("o.status IN ('paid','shipped')");
-    }
+
 
 
     const where = buildWhereClause(conditions);
