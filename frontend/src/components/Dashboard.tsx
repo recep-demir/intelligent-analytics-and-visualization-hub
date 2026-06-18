@@ -316,7 +316,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
 
       {/* Province Map */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
+        <p className="text-sm font-medium text-gray-400 mb-3">Revenue by Province</p>
         <CanadaMap data={mapData} legend="Revenue" />
       </div>
 
