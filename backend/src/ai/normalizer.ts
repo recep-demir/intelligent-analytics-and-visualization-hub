@@ -163,6 +163,28 @@ function detectMetric(question: string, configMetric?: string): Metric | undefin
   return undefined  // undefined → SQL builder defaults to o.subtotal
 }
 
+// ---------------------------------------------------------------------------
+// detectStatusFilters — deterministic, engine-independent status detection.
+// Neither AI engine reliably extracts status filters: Gemini doesn't always
+// follow its prompt instructions, and a hardcoded keyword list embedded in an
+// engine can silently drift out of sync with the actual status values in the
+// data (this list previously missed "shipping"/"payment" — two real, distinct
+// statuses confirmed in the seed data, separate from "shipped"/"paid").
+// Scanning the question text directly and treating it as authoritative avoids
+// both failure modes, regardless of which engine resolved the query.
+// ---------------------------------------------------------------------------
+const STATUS_KEYWORDS = ['shipped', 'shipping', 'paid', 'payment', 'cart', 'pending', 'cancelled', 'refunded']
+
+function detectStatusFilters(question: string): string[] {
+  const q = question.toLowerCase()
+  return STATUS_KEYWORDS.filter(s => {
+    if (!new RegExp(`\\b${s}\\b`).test(q)) return false
+    // "paid"/"paid taxes" modifies the tax noun here, not an order status
+    if (s === 'paid' && /\b(paid\s+tax(?:es)?|tax(?:es)?\s+paid)\b/.test(q)) return false
+    return true
+  })
+}
+
 // Dimensions with a known small number of distinct values — no default LIMIT needed
 const LOW_CARDINALITY: GroupByValue[] = ['province', 'status', 'month', 'year', 'total']
 
@@ -283,27 +305,22 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
 
   if (seriesKey) resolved.seriesKey = seriesKey
 
+  // Status filters are determined directly from the question text rather than trusted
+  // from either AI engine — see detectStatusFilters() for why. This replaces whatever
+  // status filter(s) the engine guessed with the deterministic set (possibly none).
+  resolved.filters = resolved.filters.filter(f => f.field !== 'status')
+  for (const value of detectStatusFilters(question)) {
+    resolved.filters.push({ field: 'status', operator: 'eq', value })
+  }
+
   const metric = detectMetric(question, config.metric)
   if (metric) {
     resolved.metric = metric
-
-    if (metric === 'tax' || metric === 'both') {
-      // Remove false status='paid' filter when "paid" modifies the tax noun, not an order status
-      if (/\b(paid\s+tax(?:es)?|tax(?:es)?\s+paid)\b/i.test(question)) {
-        resolved.filters = resolved.filters.filter(f => !(f.field === 'status' && f.value === 'paid'))
-      }
-
-      // Tax is only meaningful on completed orders (paid + shipped) — matches dashboard logic.
-      // Only inject when the user hasn't explicitly filtered by status.
-      const hasExplicitStatusFilter = resolved.filters.some(f => f.field === 'status')
-      if (!hasExplicitStatusFilter) {
-        resolved.filters = [
-          ...resolved.filters,
-          { field: 'status' as const, operator: 'eq' as const, value: 'paid' },
-          { field: 'status' as const, operator: 'eq' as const, value: 'shipped' },
-        ]
-      }
-    }
+    // No default status filter is injected here. Revenue/tax/total must report the same
+    // basis (all orders) no matter which metric is requested — restricting only tax/both
+    // to paid+shipped previously made "revenue" report two different numbers depending on
+    // whether tax was also requested in the same query. Matches the dashboard, which also
+    // applies no default status filter to its equivalent aggregates.
   }
 
   if (chartType === 'heatmap') {

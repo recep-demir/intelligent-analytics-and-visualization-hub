@@ -157,8 +157,9 @@ export class LocalEngine implements AIEngine {
       }
     }
 
-    // Status filter
-    const orderStatuses = ['shipped', 'paid', 'cart', 'pending', 'cancelled', 'refunded'];
+    // Status filter — must match every distinct status value in the Orders table
+    // (verified via seed data: cart, paid, payment, shipped, shipping)
+    const orderStatuses = ['shipped', 'shipping', 'paid', 'payment', 'cart', 'pending', 'cancelled', 'refunded'];
     for (const s of orderStatuses) {
       if (q.includes(s)) {
         filters.push({ field: 'status', operator: 'eq', value: s });
