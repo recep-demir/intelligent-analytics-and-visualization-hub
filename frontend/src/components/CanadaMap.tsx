@@ -158,7 +158,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                   })
                 }
               </Geographies>
-              {PROVINCE_LABELS.map(({ province, capital, coords }) => (
+              {PROVINCE_LABELS.map(({ province, capital, coords, anchor, dx, dy }) => (
                 <Marker key={province} coordinates={coords}>
                   <circle
                     r={2.5}
@@ -177,6 +177,14 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     }}
                     onMouseLeave={() => setTooltip(null)}
                   />
+                  <text
+                    textAnchor={anchor}
+                    x={dx}
+                    y={dy}
+                    style={{ fontSize: "7px", fill: "#d1d5db", fontFamily: "sans-serif", pointerEvents: "none" }}
+                  >
+                    {capital}
+                  </text>
                 </Marker>
               ))}
             </ComposableMap>
