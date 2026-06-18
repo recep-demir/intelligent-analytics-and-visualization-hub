@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Bar, Line, Pie } from "react-chartjs-2";
+import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
@@ -124,13 +124,13 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.topProvinces]);
 
-  const bottomProductsChart = useMemo((): ChartDataShape<BarDataset> => ({
+  const bottomProductsChart = useMemo(() => ({
     labels: data?.bottomProducts.map(p => p.name) ?? [],
     datasets: [{
-      label:           "Revenue",
       data:            data?.bottomProducts.map(p => p.revenue) ?? [],
       backgroundColor: CHART_COLORS,
-      borderRadius:    4,
+      borderWidth:     2,
+      borderColor:     "#1f2937",
     }],
   }), [data?.bottomProducts]);
 
@@ -296,9 +296,10 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       </div>
 
       {/* Row 3: Bottom products */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <div className="relative h-64 md:h-80">
-          <Bar data={bottomProductsChart} options={{ ...horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue", "Revenue", "Product"), maintainAspectRatio: false }} />
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col items-center">
+        <p className="text-sm font-medium text-gray-400 mb-3 self-start">Top 5 Lowest-Performing Products by Revenue</p>
+        <div className="relative h-64 md:h-80 w-full max-w-md">
+          <Doughnut data={bottomProductsChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: "#d1d5db", padding: 16 } } } }} />
         </div>
       </div>
 
