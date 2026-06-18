@@ -15,10 +15,14 @@ Live data sample (use these to understand real field shapes and value ranges):
 
 Orders (recent rows):
 [
-  { "id": 1, "status": "shipped",   "tax": 62.03,  "subtotal": 1240.50, "total": 1302.53, "createdAt": "2023-04-12T10:22:00Z" },
-  { "id": 2, "status": "pending",   "tax": 44.50,  "subtotal":  890.00, "total":  934.50, "createdAt": "2023-06-01T08:14:00Z" },
-  { "id": 3, "status": "cancelled", "tax": 31.10,  "subtotal":  622.00, "total":  653.10, "createdAt": "2022-11-19T16:45:00Z" }
+  { "id": 1, "status": "shipped",   "tax": 0.15, "subtotal": 628.30,  "total": 94.24,  "createdAt": "2023-04-12T10:22:00Z" },
+  { "id": 2, "status": "pending",   "tax": 0.15, "subtotal": 1775.09, "total": 266.26, "createdAt": "2023-06-01T08:14:00Z" },
+  { "id": 3, "status": "cancelled", "tax": 0.15, "subtotal": 1269.52, "total": 190.43, "createdAt": "2022-11-19T16:45:00Z" }
 ]
+IMPORTANT — field semantics:
+  tax      = tax RATE (always 0.15 = 15%). Do NOT aggregate this column — it has no dollar value.
+  subtotal = pre-tax revenue in dollars.
+  total    = tax AMOUNT in dollars (= subtotal × 0.15). Use this for "taxes / tax collected" queries.
 
 Addresses (sample):
 [
@@ -50,6 +54,7 @@ Your only job is to convert a plain-English question into a ChartConfig JSON obj
 ## Database tables
 
   Orders        (id, status, tax, subtotal, total, addressId, createdAt)
+                 — subtotal = pre-tax revenue in $ | tax = tax RATE (0.15, not $) | total = tax AMOUNT in $ (= subtotal × 0.15)
   OrderItems    (id, price, quantity, orderId, productId, createdAt)
   Products      (id, name, color, isPublished, groupId, createdAt)
   ProductGroups (id, name, createdAt)
@@ -134,6 +139,24 @@ Key relationships:
   17. Nonsensical / gibberish / completely unrelated to this domain
       → groupBy "none"
 
+## Metric rules — which Orders money field to aggregate
+
+  Set "metric" when the question refers to a specific money field:
+  - "revenue and tax", "revenue and taxes", "revenue vs tax", "revenue versus tax",
+    "revenue alongside tax", "combined revenue and tax", "revenue and tax collected",
+    "taxes and revenue", "both metrics" → "both"  (shows Revenue + Tax Collected side by side)
+    NOTE: "revenue and taxes" is NOT "grand total". Grand total = subtotal + tax as one number.
+    "revenue and taxes" = show BOTH as separate values. Always use "both" here.
+  - "tax", "taxes", "tax amount", "tax collected", "tax paid" → "tax"   (uses o.total = tax dollars)
+  - "grand total", "total amount", "total charged", "total bill" → "total" (uses o.subtotal + o.total)
+  - "revenue", "sales", "subtotal", "pre-tax" or no qualifier → omit "metric" (default: o.subtotal)
+
+  Example: "show me paid taxes by province" → metric: "tax"
+  Example: "what is the grand total for 2023?" → metric: "total"
+  Example: "show me revenue by product" → omit metric (default)
+  Example: "show me revenue and taxes by province" → metric: "both"
+  Example: "show me the top 5 provinces by revenue and taxes" → metric: "both", limit: 5
+
 ## Aggregation rules
 
   Set "aggregation" only when the question implies a specific calculation:
@@ -183,13 +206,15 @@ Key relationships:
   "filters": [{ "field": "year", "operator": "eq", "value": "2023" }],
   "aggregation": "sum",
   "limit": 10,
-  "title": "Revenue by province in 2023"
+  "metric": "tax",
+  "title": "Tax collected by province in 2023"
 }
 
 Notes:
   - "filters" may be an empty array [] if no filters apply.
   - "limit" is optional — omit if the question does not request a top/bottom N.
   - "aggregation" is optional — omit when defaulting to sum.
+  - "metric" is optional — omit when defaulting to subtotal (pre-tax revenue). Set to "tax" or "total" only when the question explicitly asks for those fields.
   - "title" is required — short human-readable description of what the chart shows.
 `.trim()
 
@@ -223,15 +248,20 @@ export function buildInsightsPrompt(
   chartType: string,
   question: string,
   data: unknown[],
-  resolved?: { aggregation?: string; groupBy?: string | undefined }
+  resolved?: { aggregation?: string; groupBy?: string | undefined; metric?: string }
 ): string {
   const agg = resolved?.aggregation ?? "sum";
+  const metricBase =
+    resolved?.metric === "tax"   ? "tax" :
+    resolved?.metric === "total" ? "grand total" :
+    resolved?.metric === "both"  ? "revenue and tax" :
+    "revenue";
   const metricLabel =
     agg === "count" ? "order count" :
-    agg === "avg"   ? "average revenue" :
-    agg === "min"   ? "minimum order value" :
-    agg === "max"   ? "maximum order value" :
-    "revenue";
+    agg === "avg"   ? `average ${metricBase}` :
+    agg === "min"   ? `minimum ${metricBase}` :
+    agg === "max"   ? `maximum ${metricBase}` :
+    metricBase;
   const dimLabel = resolved?.groupBy ?? "category";
 
   return `
