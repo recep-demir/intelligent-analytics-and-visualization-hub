@@ -125,7 +125,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }), [data?.topProvinces]);
 
   const mapData = useMemo(
-    () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders, revenue: p.revenue })) ?? [],
+    () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
     [data?.topProvinces],
   );
 
@@ -253,7 +253,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       {/* Province Map */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
         <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
-        <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
+        <CanadaMap data={mapData} legend="Revenue" />
       </div>
 
       {/* Row 1: Line + Order Status Bar */}

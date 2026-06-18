@@ -63,7 +63,7 @@ function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number
 }
 
 interface Props {
-  data: { name: string; value: number; revenue?: number }[];
+  data: { name: string; value: number; orders?: number }[];
   aggregation?: string;
   legend?: string;
 }
@@ -72,10 +72,10 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   const lookup: Record<string, number> = {};
-  const revenueLookup: Record<string, number> = {};
+  const ordersLookup: Record<string, number> = {};
   data.forEach(d => {
     lookup[normalizeProvince(d.name)] = d.value;
-    if (d.revenue !== undefined) revenueLookup[normalizeProvince(d.name)] = d.revenue;
+    if (d.orders !== undefined) ordersLookup[normalizeProvince(d.name)] = d.orders;
   });
 
   const vals  = Object.values(lookup);
@@ -150,8 +150,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     onMouseEnter={() => {
                       const normProv = normalizeProvince(province);
                       const val = lookup[normProv] ?? 0;
-                      const rev = revenueLookup[normProv];
-                      const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
+                      const rev = ordersLookup[normProv];
+                      const revStr = rev !== undefined ? `  ·  ${formatVal(rev, "count")} orders` : "";
                       setTooltip(`${province}${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${revStr}`);
                     }}
                     onMouseLeave={() => setTooltip(null)}
@@ -196,8 +196,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                           stroke="#374151"
                           strokeWidth={0.8}
                           onMouseEnter={() => {
-                            const rev = revenueLookup[name];
-                            const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
+                            const rev = ordersLookup[name];
+                            const revStr = rev !== undefined ? `  ·  ${formatVal(rev, "count")} orders` : "";
                             setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${revStr}`);
                           }}
                           onMouseLeave={() => setTooltip(null)}
