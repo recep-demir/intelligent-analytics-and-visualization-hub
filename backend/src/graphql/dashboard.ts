@@ -15,6 +15,7 @@ export const dashboardTypeDefs = `#graphql
     topProductGroups: [GroupRevenue!]!
     topProvinces:     [ProvinceCount!]!
     categoryRevenue:  [CategoryRevenue!]!
+    topProducts:      [ProductRevenue!]!
     bottomProducts:   [ProductRevenue!]!
   }
 
@@ -22,7 +23,7 @@ export const dashboardTypeDefs = `#graphql
   type MonthlyRevenue  { month: String!    revenue: Float! }
   type StatusCount     { status: String!   count: Int!     }
   type GroupRevenue    { name: String!     revenue: Float! }
-  type ProvinceCount   { province: String! orders: Int!    }
+  type ProvinceCount   { province: String! orders: Int! revenue: Float! }
   type CategoryRevenue  { category: String! revenue: Float! }
   type ProductRevenue   { name: String!     revenue: Float! }
 
@@ -93,7 +94,7 @@ function buildOrderLevelWhere(
   args: DashboardStatsArgs,
   options: { useMonthlyRevenueDefaults?: boolean } = {},
 ): { where: string; replacements: SqlReplacements } {
-  const conditions: string[] = [];
+  const conditions: string[] = ["LOWER(a.country) = 'ca'"];
   const replacements = buildReplacements(args);
 
   if (hasText(args.status)) {
@@ -150,7 +151,7 @@ function buildItemConditions(
   args: DashboardStatsArgs,
   options: { applyStatusDefault?: boolean } = {},
 ): string[] {
-  const conditions: string[] = [];
+  const conditions: string[] = ["LOWER(a.country) = 'ca'"];
 
   if (hasText(args.status)) {
     conditions.push("LOWER(o.status) = LOWER(:status)");
@@ -333,22 +334,23 @@ async function fetchTopProductGroups(
 
 async function fetchTopProvinces(
   args: DashboardStatsArgs,
-): Promise<{ province: string; orders: number }[]> {
+): Promise<{ province: string; orders: number; revenue: number }[]> {
   const { where, replacements } = buildOrderLevelWhere(args);
 
   const [rows] = await sequelize.query(
     `
-    SELECT a.province, COUNT(o.id) as orders
+    SELECT a.province, COUNT(o.id) as orders, ROUND(SUM(o.subtotal), 2) as revenue
     FROM Orders o
     JOIN Addresses a ON o.addressId = a.id
     ${where}
     GROUP BY a.province
     ORDER BY orders DESC
+    LIMIT 8
   `,
     { replacements },
   );
 
-  return rows as { province: string; orders: number }[];
+  return rows as { province: string; orders: number; revenue: number }[];
 }
 
 async function fetchCategoryRevenue(
@@ -380,6 +382,44 @@ async function fetchCategoryRevenue(
   );
 
   return rows as { category: string; revenue: number }[];
+}
+
+async function fetchTopProducts(
+  args: DashboardStatsArgs,
+): Promise<{ name: string; revenue: number }[]> {
+  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const replacements = buildReplacements(args);
+  const orderJoins = buildItemOrderJoins(args, true);
+
+  if (hasText(args.category)) {
+    conditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM ProductGroupCategories pgc
+          JOIN ProductCategories pc ON pgc.categoryId = pc.id
+          WHERE pgc.groupId = p.groupId
+            AND LOWER(pc.name) = LOWER(:category)
+        )
+      `);
+  }
+
+  const where = buildWhereClause(conditions);
+
+  const [rows] = await sequelize.query(
+    `
+    SELECT p.name, ROUND(SUM(oi.price * oi.quantity), 2) as revenue
+    FROM OrderItems oi
+    JOIN Products p ON oi.productId = p.id
+    ${orderJoins}
+    ${where}
+    GROUP BY p.id, p.name
+    ORDER BY revenue DESC
+    LIMIT 5
+    `,
+    { replacements },
+  );
+
+  return rows as { name: string; revenue: number }[];
 }
 
 async function fetchBottomProducts(
@@ -457,6 +497,7 @@ export const dashboardResolvers = {
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        topProducts,
         bottomProducts,
       ] = await Promise.all([
         fetchTaxSummary(args),
@@ -466,6 +507,7 @@ export const dashboardResolvers = {
         fetchTopProductGroups(args),
         fetchTopProvinces(args),
         fetchCategoryRevenue(args),
+        fetchTopProducts(args),
         fetchBottomProducts(args),
       ]);
 
@@ -477,6 +519,7 @@ export const dashboardResolvers = {
         topProductGroups,
         topProvinces,
         categoryRevenue,
+        topProducts,
         bottomProducts,
       };
     },

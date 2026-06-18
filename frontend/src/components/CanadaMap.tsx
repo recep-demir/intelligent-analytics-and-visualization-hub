@@ -1,28 +1,29 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 
 const CANADA_GEO = "/canada-provinces.json";
 
 const PROVINCE_LABELS: {
   province: string;
+  capital: string;
   coords: [number, number];
   anchor: "middle" | "start" | "end";
   dx: number;
   dy: number;
 }[] = [
-  { province: "British Columbia",          coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
-  { province: "Alberta",                   coords: [-113.49, 53.54], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Saskatchewan",              coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Manitoba",                  coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Ontario",                   coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Quebec",                    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
-  { province: "New Brunswick",             coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
-  { province: "Nova Scotia",               coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
-  { province: "Prince Edward Island",      coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
-  { province: "Newfoundland and Labrador", coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Yukon",                     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Northwest Territories",     coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Nunavut",                   coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "British Columbia",          capital: "Victoria",       coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "Alberta",                   capital: "Edmonton",       coords: [-113.49, 53.55], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Saskatchewan",              capital: "Regina",         coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Manitoba",                  capital: "Winnipeg",       coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Ontario",                   capital: "Toronto",        coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Quebec",                    capital: "Quebec City",    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
+  { province: "New Brunswick",             capital: "Fredericton",    coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
+  { province: "Nova Scotia",               capital: "Halifax",        coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
+  { province: "Prince Edward Island",      capital: "Charlottetown",  coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
+  { province: "Newfoundland and Labrador", capital: "St. John's",     coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Yukon",                     capital: "Whitehorse",     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Northwest Territories",     capital: "Yellowknife",    coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Nunavut",                   capital: "Iqaluit",        coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
 ];
 
 function normalizeProvince(s: string): string {
@@ -47,6 +48,11 @@ function formatVal(v: number, aggregation?: string): string {
   return `$${Number(v).toFixed(2)}`;
 }
 
+function getTooltipPos(e: MouseEvent, target: SVGElement): { x: number; y: number } {
+  const rect = target.closest(".rounded-xl")!.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
 function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number; agg?: string; label: string }) {
   return (
     <div className="flex flex-col items-center justify-between py-2 w-20 shrink-0">
@@ -62,18 +68,26 @@ function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number
   );
 }
 
+interface TooltipState {
+  text: string;
+  x: number;
+  y: number;
+}
+
 interface Props {
-  data: { name: string; value: number }[];
+  data: { name: string; value: number; orders?: number }[];
   aggregation?: string;
   legend?: string;
 }
 
 export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
-  const [tooltip, setTooltip] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const lookup: Record<string, number> = {};
+  const ordersLookup: Record<string, number> = {};
   data.forEach(d => {
     lookup[normalizeProvince(d.name)] = d.value;
+    if (d.orders !== undefined) ordersLookup[normalizeProvince(d.name)] = d.orders;
   });
 
   const vals  = Object.values(lookup);
@@ -84,19 +98,33 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const MARITIMES = ["New Brunswick", "Nova Scotia", "Prince Edward Island", "Newfoundland and Labrador", "Newfoundland"];
   const hasMaritimeData = MARITIMES.some(p => (lookup[normalizeProvince(p)] ?? 0) > 0);
 
+  const buildTooltip = useCallback((rawName: string, name: string, val: number): string => {
+    const orders = ordersLookup[name];
+    const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
+    return `${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${ordersStr}`;
+  }, [ordersLookup, aggregation]);
+
   return (
     <div className="w-full">
-      <div className="h-8 mb-2 flex items-center justify-center">
-        {tooltip && (
-          <span className="text-sm font-bold text-white bg-gray-700 border border-gray-500 px-4 py-1.5 rounded-lg shadow-lg">
-            {tooltip}
-          </span>
-        )}
-      </div>
-
       <div className="flex items-stretch gap-4">
         <div className="flex-1 relative">
-          <div className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117]">
+          <div
+            className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117] relative"
+            onMouseMove={e => {
+              if (!tooltip) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTooltip(t => t ? { ...t, x: e.clientX - rect.left, y: e.clientY - rect.top } : null);
+            }}
+          >
+            {tooltip && (
+              <div
+                className="pointer-events-none absolute z-20 text-sm font-bold text-white bg-gray-800 border border-gray-500 px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap"
+                style={{ left: tooltip.x + 12, top: tooltip.y - 36 }}
+              >
+                {tooltip.text}
+              </div>
+            )}
+
             <ComposableMap
               projection="geoAzimuthalEqualArea"
               projectionConfig={{ rotate: [96, -60, 0], scale: 500 }}
@@ -120,7 +148,10 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                         fillOpacity={val ? 0.9 : 0.4}
                         stroke="#374151"
                         strokeWidth={0.4}
-                        onMouseEnter={() => setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}`)}
+                        onMouseEnter={e => {
+                          const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                          setTooltip({ text: buildTooltip(rawName, name, val), ...pos });
+                        }}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
                           default: { outline: "none" },
@@ -132,7 +163,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                   })
                 }
               </Geographies>
-              {PROVINCE_LABELS.map(({ province, coords, anchor, dx, dy }) => (
+              {PROVINCE_LABELS.map(({ province, capital, coords, anchor, dx, dy }) => (
                 <Marker key={province} coordinates={coords}>
                   <circle
                     r={2.5}
@@ -141,7 +172,14 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     stroke="#0d1117"
                     strokeWidth={0.6}
                     style={{ cursor: "pointer" }}
-                    onMouseEnter={() => setTooltip(province)}
+                    onMouseEnter={e => {
+                      const normProv = normalizeProvince(province);
+                      const val = lookup[normProv] ?? 0;
+                      const orders = ordersLookup[normProv];
+                      const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
+                      const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                      setTooltip({ text: `${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${ordersStr}`, ...pos });
+                    }}
                     onMouseLeave={() => setTooltip(null)}
                   />
                   <text
@@ -150,7 +188,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     y={dy}
                     style={{ fontSize: "7px", fill: "#d1d5db", fontFamily: "sans-serif", pointerEvents: "none" }}
                   >
-                    {province}
+                    {capital}
                   </text>
                 </Marker>
               ))}
@@ -183,7 +221,10 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                           fillOpacity={val ? 0.9 : 0.35}
                           stroke="#374151"
                           strokeWidth={0.8}
-                          onMouseEnter={() => setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}`)}
+                          onMouseEnter={e => {
+                            const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                            setTooltip({ text: buildTooltip(rawName, name, val), ...pos });
+                          }}
                           onMouseLeave={() => setTooltip(null)}
                           style={{
                             default: { outline: "none" },

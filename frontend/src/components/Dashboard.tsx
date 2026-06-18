@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { Bar, Line } from "react-chartjs-2";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Bar, Line, Pie, Bubble } from "react-chartjs-2";
+import type { Chart, BubbleDataPoint, PointElement } from "chart.js";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
@@ -7,6 +8,38 @@ import { useFilterOptions } from "../hooks/useFilterOptions";
 import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
+
+function fmtRev(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
+interface ProductBubblePoint extends BubbleDataPoint {
+  name: string;
+}
+
+const bubbleLabelPlugin = {
+  id: "productBubbleLabels",
+  afterDatasetsDraw(chart: Chart) {
+    const ctx = chart.ctx;
+    ctx.save();
+    chart.data.datasets.forEach((dataset, dsIdx: number) => {
+      chart.getDatasetMeta(dsIdx).data.forEach((element, j: number) => {
+        const point = element as PointElement;
+        const raw = dataset.data[j] as unknown as ProductBubblePoint;
+        const { x, y } = point;
+        const r: number = (point.options as { radius?: number }).radius ?? 14;
+
+        ctx.textAlign = "center";
+        ctx.font = "8px sans-serif";
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText(fmtRev(raw.y), x, y + r + 10);
+      });
+    });
+    ctx.restore();
+  },
+};
 
 function formatCurrency(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
@@ -94,13 +127,13 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.yearlyRevenue]);
 
-  const ordersByStatusChart = useMemo((): ChartDataShape<BarDataset> => ({
+  const ordersByStatusChart = useMemo(() => ({
     labels: data?.ordersByStatus.map(s => s.status) ?? [],
     datasets: [{
-      label:           "Order Count",
       data:            data?.ordersByStatus.map(s => s.count) ?? [],
       backgroundColor: CHART_COLORS,
-      borderRadius:    4,
+      borderWidth:     2,
+      borderColor:     "#1f2937",
     }],
   }), [data?.ordersByStatus]);
 
@@ -124,28 +157,51 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.topProvinces]);
 
-  const categoryBarChart = useMemo((): ChartDataShape<BarDataset> => ({
-    labels: data?.categoryRevenue.map(c => c.category) ?? [],
-    datasets: [{
-      label: "Revenue",
-      data:  data?.categoryRevenue.map(c => c.revenue) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  }), [data?.categoryRevenue]);
+  const bubbleTickLabels = useRef<Record<number, string>>({});
 
-  const bottomProductsChart = useMemo((): ChartDataShape<BarDataset> => ({
-    labels: data?.bottomProducts.map(p => p.name) ?? [],
-    datasets: [{
-      label: "Revenue",
-      data:  data?.bottomProducts.map(p => p.revenue) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  }), [data?.bottomProducts]);
+  const bubbleN = useMemo(() => {
+    const allTop    = data?.topProducts    ?? [];
+    const allBottom = data?.bottomProducts ?? [];
+    const totalUnique = new Set([...allTop.map(p => p.name), ...allBottom.map(p => p.name)]).size;
+    return Math.min(5, Math.max(1, Math.floor(totalUnique / 2)));
+  }, [data?.topProducts, data?.bottomProducts]);
+
+  const productBubbleChart = useMemo(() => {
+    const n           = bubbleN;
+    const allTopProds = data?.topProducts    ?? [];
+    const allBotProds = data?.bottomProducts ?? [];
+
+    const topProds    = allTopProds.slice(0, n);
+    const topNames    = new Set(topProds.map(p => p.name));
+    const bottomProds = allBotProds.filter(p => !topNames.has(p.name)).slice(0, n);
+
+    const labels: Record<number, string> = {};
+    topProds.forEach((p, i)    => { labels[i]         = p.name; });
+    bottomProds.forEach((p, i) => { labels[i + n + 1] = p.name; });
+    bubbleTickLabels.current = labels;
+
+    return {
+      datasets: [
+        {
+          label: `Top ${topProds.length} Products`,
+          data: topProds.map((p, i) => ({ x: i, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
+          backgroundColor: "rgba(34, 197, 94, 0.7)",
+          borderColor: "rgba(34, 197, 94, 1)",
+          borderWidth: 1.5,
+        },
+        {
+          label: `Bottom ${bottomProds.length} Products`,
+          data: bottomProds.map((p, i) => ({ x: i + n + 1, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
+          backgroundColor: "rgba(239, 68, 68, 0.7)",
+          borderColor: "rgba(239, 68, 68, 1)",
+          borderWidth: 1.5,
+        },
+      ],
+    };
+  }, [data?.topProducts, data?.bottomProducts, bubbleN]);
 
   const mapData = useMemo(
-    () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders })) ?? [],
+    () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
     [data?.topProvinces],
   );
 
@@ -272,8 +328,8 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
 
       {/* Province Map */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
-        <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
+        <p className="text-sm font-medium text-gray-400 mb-3">Revenue by Province</p>
+        <CanadaMap data={mapData} legend="Revenue" />
       </div>
 
       {/* Row 1: Line + Order Status Bar */}
@@ -283,9 +339,10 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
             <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
           </div>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <div className="relative h-64 md:h-96">
-            <Bar data={ordersByStatusChart} options={{ ...baseChartOptions("Order Volume by Status", "Order Status", "Count"), maintainAspectRatio: false }} />
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center">
+          <p className="text-sm font-medium text-gray-400 mb-3 self-start">Order Volume by Status</p>
+          <div className="relative h-64 md:h-80 w-full flex items-center justify-center">
+            <Pie data={ordersByStatusChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: "#d1d5db", padding: 16 } } } }} />
           </div>
         </div>
       </div>
@@ -294,25 +351,71 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
+            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions((data?.topProductGroups.length ?? 0) < 8 ? "Top Product Groups by Revenue" : "Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
+            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions(filters.province ? `Orders — ${filters.province}` : "Top 8 Provinces by Orders", filters.province ? "Number of Orders" : "Order Count", "Province"), maintainAspectRatio: false }} />
           </div>
         </div>
       </div>
 
-      {/* Row 3: Tax & Sales Contribution by Product Category */}
+      {/* Row 3: Top vs Bottom products bubble */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category", "Revenue", "Category")} />
+        <p className="text-sm font-medium text-gray-400 mb-3">Top {bubbleN} vs Bottom {bubbleN} Products by Revenue</p>
+        <div className="relative h-80 md:h-[26rem]">
+          <Bubble
+            data={productBubbleChart}
+            plugins={[bubbleLabelPlugin]}
+            options={{
+              maintainAspectRatio: false,
+              layout: { padding: { top: 10, bottom: 8 } },
+              plugins: {
+                legend: { position: "top", labels: { color: "#d1d5db", padding: 16 } },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => {
+                      const raw = ctx.raw as { x: number; y: number; name: string };
+                      return `${raw.name}: ${fmtRev(raw.y)}`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  min: -0.8,
+                  max: bubbleN * 2 + 0.8,
+                  ticks: {
+                    color: "#9ca3af",
+                    stepSize: 1,
+                    font: { size: 9 },
+                    maxRotation: 0,
+                    autoSkip: false,
+                    callback: (val) => {
+                      const label = bubbleTickLabels.current[val as number];
+                      if (!label) return "";
+                      return label.split(" ");
+                    },
+                  },
+                  grid: { color: "#374151" },
+                },
+                y: {
+                  type: "logarithmic",
+                  title: { display: true, text: "Revenue (CAD) — log scale", color: "#9ca3af" },
+                  ticks: {
+                    color: "#9ca3af",
+                    callback: (v) => fmtRev(Number(v)),
+                  },
+                  grid: { color: "#374151" },
+                },
+              },
+            }}
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-2 text-center">Green = top {bubbleN} performers · Red = bottom {bubbleN} · Gap separates the two groups · Log scale makes both visible</p>
       </div>
 
-      {/* Row 4: Top 5 Lowest-Performing Products */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={bottomProductsChart} options={horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue", "Revenue", "Product")} />
-      </div>
     </div>
   );
 }
