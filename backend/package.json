@@ -7,8 +7,9 @@
   "scripts": {
     "test": "jest",
     "dev": "ts-node server.ts",
-    "build": "tsc",    
-    "seed": "ts-node seed.ts"
+    "build": "tsc",
+    "seed": "ts-node seed.ts",
+    "start": "npm run seed && node dist/server.js"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
