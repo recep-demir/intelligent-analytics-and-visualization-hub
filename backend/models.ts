@@ -179,6 +179,43 @@ SharedChartLink.init(
   }
 );
 
+export class SharedDashboard extends Model {
+  declare id: string;
+  declare filtersJson: string;
+  declare title: string | null;
+  declare createdByUserId: number;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+SharedDashboard.init(
+  {
+    id: {
+      type: DataTypes.STRING,
+      primaryKey: true,
+    },
+    filtersJson: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    createdByUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: 'Users', key: 'id' },
+    },
+  },
+  {
+    sequelize,
+    modelName: 'SharedDashboard',
+    tableName: 'SharedDashboards',
+    timestamps: true,
+  }
+);
+
 User.hasMany(SavedChart, {
   foreignKey: 'createdByUserId'
 });
@@ -194,6 +231,9 @@ SavedChart.hasMany(SharedChartLink, {
 SharedChartLink.belongsTo(SavedChart, {
   foreignKey: 'savedChartId'
 });
+
+User.hasMany(SharedDashboard, { foreignKey: 'createdByUserId' });
+SharedDashboard.belongsTo(User, { foreignKey: 'createdByUserId' });
 
 try {
   extendTypes({
