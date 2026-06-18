@@ -1,81 +1,153 @@
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
-import { Bar, Line, Doughnut } from "react-chartjs-2";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
-import { useDashboardStats } from "../hooks/useDashboardStats";
-import type { KpiData } from "../types/dashboard";
-
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
-);
-
-const CHART_COLORS = [
-  "#3b82f6", "#10b981", "#6366f1", "#f59e0b",
-  "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6",
-];
-
-const DOUGHNUT_COLORS = ["#3b82f6", "#10b981", "#6366f1", "#f59e0b", "#ef4444"];
-
-function baseChartOptions(title: string) {
-  return {
-    responsive: true,
-    plugins: {
-      legend: { display: false },
-      title: { display: true, text: title, color: "#e2e8f0", font: { size: 14 } },
-    },
-    scales: {
-      x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-      y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-    },
-  };
-}
-
-function horizontalBarOptions(title: string) {
-  return {
-    ...baseChartOptions(title),
-    indexAxis: "y" as const,
-  };
-}
-
-function computeKpis(stats: ReturnType<typeof useDashboardStats>["data"]): KpiData {
-  if (!stats) return { totalRevenue: 0, completedOrders: 0, avgOrderValue: 0, conversionRate: 0 };
-
-  const totalRevenue = stats.monthlyRevenue.reduce((s, r) => s + r.revenue, 0);
-
-  const completedOrders = stats.ordersByStatus
-    .filter((s) => s.status === "paid" || s.status === "shipped")
-    .reduce((s, r) => s + r.count, 0);
-
-  const totalOrders = stats.ordersByStatus.reduce((s, r) => s + r.count, 0);
-
-  return {
-    totalRevenue,
-    completedOrders,
-    avgOrderValue:  completedOrders > 0 ? totalRevenue / completedOrders : 0,
-    conversionRate: totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0,
-  };
-}
+import { CanadaMap } from "./CanadaMap";
+import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
+import { useFilterOptions } from "../hooks/useFilterOptions";
+import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
+import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
+import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
 
 function formatCurrency(value: number): string {
-  return value >= 1000
-    ? `CA$${(value / 1000).toFixed(1)}K`
-    : `CA$${value.toFixed(0)}`;
+  return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
 }
 
-export function Dashboard() {
-  const { data, loading, error } = useDashboardStats();
+const SELECT_CLS = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
+
+export function Dashboard({ initialFilters, viewerMode = false , canShare = false}: {
+  initialFilters?: DashboardFilters;
+  viewerMode?: boolean;
+  canShare?: boolean;
+}) {
+  const [filters, setFilters] = useState<DashboardFilters>(
+    initialFilters ?? { yearFrom: null, yearTo: null, province: null, status: null, category: null }
+  );
+  useEffect(() => {
+  if (initialFilters) {
+    setFilters(initialFilters);
+  }
+}, [initialFilters]);
+  const { data, loading, error } = useDashboardStats(filters);
+  const { categories, provinces, statuses, years } = useFilterOptions();
+
+  function set(key: keyof DashboardFilters, raw: string) {
+    const isYear = key === "yearFrom" || key === "yearTo";
+    const value = raw === "" ? null : isYear ? Number(raw) : raw;
+    setShareUrl(null);   
+    setFilters(prev => {
+      const next = { ...prev, [key]: value };
+      if (next.yearFrom && next.yearTo && next.yearFrom > next.yearTo) {
+        next.yearTo = next.yearFrom;
+      }
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setShareUrl(null);   
+    setFilters({ yearFrom: null, yearTo: null, province: null, status: null, category: null });
+  }
+
+  const isFiltered = Object.values(filters).some(v => v != null);
+
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    setSharing(true);
+    setShareUrl(null);
+    try {
+      const token = sessionStorage.getItem("token");
+      const API_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:4000";
+      const res = await fetch(`${API_URL}/api/dashboard-shares`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ filtersJson: JSON.stringify(filters) }),
+      });
+      if (!res.ok) throw new Error("Failed to create share link");
+      const { shareId } = await res.json();
+      setShareUrl(`${window.location.origin}/share/${shareId}`);
+    } catch {
+      setShareUrl("error");
+    } finally {
+      setSharing(false);
+    }
+  }, [filters]);
+
+  const revenueChartTitle = useMemo(() => {
+    if (filters.yearFrom && filters.yearTo) return `Yearly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
+    if (filters.yearFrom) return `Yearly Revenue (from ${filters.yearFrom})`;
+    if (filters.yearTo)   return `Yearly Revenue (up to ${filters.yearTo})`;
+    return "Yearly Revenue (All Years)";
+  }, [filters.yearFrom, filters.yearTo]);
+
+  const yearlyRevenueChart = useMemo((): ChartDataShape<LineDataset> => ({
+    labels: data?.yearlyRevenue.map(r => r.year) ?? [],
+    datasets: [{
+      label: "Revenue",
+      data:  data?.yearlyRevenue.map(r => r.revenue) ?? [],
+      borderColor:     "#3b82f6",
+      backgroundColor: "rgba(59,130,246,0.15)",
+      fill:       true,
+      tension:    0.4,
+      pointRadius: 4,
+    }],
+  }), [data?.yearlyRevenue]);
+
+  const ordersByStatusChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.ordersByStatus.map(s => s.status) ?? [],
+    datasets: [{
+      label:           "Order Count",
+      data:            data?.ordersByStatus.map(s => s.count) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.ordersByStatus]);
+
+  const topProductGroupsChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.topProductGroups.map(g => g.name) ?? [],
+    datasets: [{
+      label: "Revenue",
+      data:  data?.topProductGroups.map(g => g.revenue) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.topProductGroups]);
+
+  const topProvincesChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.topProvinces.map(p => p.province) ?? [],
+    datasets: [{
+      label: "Orders",
+      data:  data?.topProvinces.map(p => p.orders) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.topProvinces]);
+
+  const categoryBarChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.categoryRevenue.map(c => c.category) ?? [],
+    datasets: [{
+      label: "Revenue",
+      data:  data?.categoryRevenue.map(c => c.revenue) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.categoryRevenue]);
+
+  const bottomProductsChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.bottomProducts.map(p => p.name) ?? [],
+    datasets: [{
+      label: "Revenue",
+      data:  data?.bottomProducts.map(p => p.revenue) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.bottomProducts]);
+
+  const mapData = useMemo(
+    () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders })) ?? [],
+    [data?.topProvinces],
+  );
 
   if (loading) {
     return (
@@ -85,113 +157,161 @@ export function Dashboard() {
     );
   }
 
-  if (error || !data) {
+   if (error) {
     return (
       <div className="bg-red-900/30 text-red-200 p-4 rounded-lg m-6">
-        {error ?? "Failed to load dashboard data."}
+        {error}
       </div>
     );
   }
 
-  const kpis = computeKpis(data);
-
-  const monthlyRevenueChart = {
-    labels: data.monthlyRevenue.map((r) => r.month),
-    datasets: [{
-      label: "Revenue (CA$)",
-      data:  data.monthlyRevenue.map((r) => r.revenue),
-      borderColor:     "#3b82f6",
-      backgroundColor: "rgba(59,130,246,0.15)",
-      fill:       true,
-      tension:    0.4,
-      pointRadius: 4,
-    }],
-  };
-
-  const ordersByStatusChart = {
-    labels: data.ordersByStatus.map((s) => s.status),
-    datasets: [{
-      data:            data.ordersByStatus.map((s) => s.count),
-      backgroundColor: DOUGHNUT_COLORS,
-      borderWidth:     2,
-      borderColor:     "#1e293b",
-    }],
-  };
-
-  const topProductGroupsChart = {
-    labels: data.topProductGroups.map((g) => g.name),
-    datasets: [{
-      label: "Revenue (CA$)",
-      data:  data.topProductGroups.map((g) => g.revenue),
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  };
-
-  const topProvincesChart = {
-    labels: data.topProvinces.map((p) => p.province),
-    datasets: [{
-      label: "Orders",
-      data:  data.topProvinces.map((p) => p.orders),
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  };
-
-  const categoryRevenueChart = {
-    labels: data.categoryRevenue.map((c) => c.category),
-    datasets: [{
-      label: "Revenue (CA$)",
-      data:  data.categoryRevenue.map((c) => c.revenue),
-      backgroundColor: [CHART_COLORS[0], CHART_COLORS[1]],
-      borderRadius:    6,
-    }],
-  };
+  if (!data) return null;
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-white">Analytics Dashboard</h1>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label="Total Revenue (2023+)"  value={formatCurrency(kpis.totalRevenue)} subtitle="paid + shipped orders" />
-        <KpiCard label="Completed Orders"        value={kpis.completedOrders.toLocaleString()} />
-        <KpiCard label="Avg Order Value"         value={formatCurrency(kpis.avgOrderValue)} />
-        <KpiCard label="Conversion Rate"         value={`${kpis.conversionRate.toFixed(1)}%`} subtitle="completed ÷ all orders" />
+    <div className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+            Analytics Dashboard
+          </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          {isFiltered && !viewerMode && (
+            <button onClick={clearFilters} className="text-sm text-blue-400 hover:text-blue-300 underline">
+              Clear filters
+            </button>
+          )}
+          {canShare && (
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              className="text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {sharing ? "Sharing…" : "Share"}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Row 1: Line + Doughnut */}
+      {shareUrl && shareUrl !== "error" && (
+        <div className="flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm">
+          <span className="text-gray-400 shrink-0">Share link:</span>
+          <code className="text-blue-300 truncate flex-1">{shareUrl}</code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(shareUrl); }}
+            className="text-xs text-gray-400 hover:text-white border border-gray-600 rounded px-2 py-1 shrink-0"
+          >
+            Copy
+          </button>
+        </div>
+      )}
+      {shareUrl === "error" && (
+        <p className="text-red-400 text-sm">Failed to create share link. Please try again.</p>
+      )}
+
+      {/* Filter Bar */}
+      {viewerMode ? (
+        <div className="flex flex-wrap gap-2 bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-gray-400 items-center">
+          <span className="font-medium text-gray-500 uppercase tracking-wider mr-1">Filtered by:</span>
+          {filters.yearFrom && <span className="bg-gray-700 px-2 py-1 rounded">Year from {filters.yearFrom}</span>}
+          {filters.yearTo   && <span className="bg-gray-700 px-2 py-1 rounded">Year to {filters.yearTo}</span>}
+          {filters.province && <span className="bg-gray-700 px-2 py-1 rounded">Province: {filters.province}</span>}
+          {filters.status   && <span className="bg-gray-700 px-2 py-1 rounded">Status: {filters.status}</span>}
+          {filters.category && <span className="bg-gray-700 px-2 py-1 rounded">Category: {filters.category}</span>}
+          {!filters.yearFrom && !filters.yearTo && !filters.province && !filters.status && !filters.category && (
+            <span className="italic">No filters — showing all data</span>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2 sm:gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Year</span>
+            <select className={SELECT_CLS} value={filters.yearFrom ?? ""} onChange={e => set("yearFrom", e.target.value)}>
+              <option value="">From</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <span className="text-gray-500 text-xs">–</span>
+            <select className={SELECT_CLS} value={filters.yearTo ?? ""} onChange={e => set("yearTo", e.target.value)}>
+              <option value="">To</option>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
+            <option value="">All provinces</option>
+            {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
+            <option value="">All statuses</option>
+            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
+            <option value="">All categories</option>
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard
+          label="Gross Revenue"
+          value={formatCurrency(data.taxSummary.grossRevenue)}
+          subtitle="net sales + tax collected"
+        />
+        <KpiCard
+          label="Net Subtotal (Before Tax)"
+          value={formatCurrency(data.taxSummary.netSales)}
+          subtitle="pre-tax revenue"
+        />
+        <KpiCard
+          label="Total Tax Collected"
+          value={formatCurrency(data.taxSummary.totalTaxCollected)}
+          subtitle="regulatory tax liability"
+        />
+      </div>
+
+      {/* Province Map */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
+        <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
+      </div>
+
+      {/* Row 1: Line + Order Status Bar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Line data={monthlyRevenueChart} options={baseChartOptions("Monthly Revenue (2023)")} />
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
+          <div className="relative w-full h-64 md:h-96">
+            <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
+          </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Doughnut
-            data={ordersByStatusChart}
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: "right", labels: { color: "#94a3b8" } },
-                title:  { display: true, text: "Orders by Status", color: "#e2e8f0", font: { size: 14 } },
-              },
-            }}
-          />
+          <div className="relative h-64 md:h-96">
+            <Bar data={ordersByStatusChart} options={{ ...baseChartOptions("Order Volume by Status", "Order Status", "Count"), maintainAspectRatio: false }} />
+          </div>
         </div>
       </div>
 
       {/* Row 2: Horizontal bars */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProductGroupsChart} options={horizontalBarOptions("Top 8 Product Groups by Revenue")} />
+          <div className="relative h-64 md:h-96">
+            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
+          </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <Bar data={topProvincesChart} options={horizontalBarOptions("Top 8 Provinces by Orders")} />
+          <div className="relative h-64 md:h-96">
+            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
+          </div>
         </div>
       </div>
 
-      {/* Row 3: Shoes vs Apparel */}
+      {/* Row 3: Tax & Sales Contribution by Product Category */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <Bar data={categoryRevenueChart} options={baseChartOptions("Shoes vs Apparel — Revenue")} />
+        <Bar data={categoryBarChart} options={horizontalBarOptions("Tax & Sales Contribution by Product Category", "Revenue", "Category")} />
+      </div>
+
+      {/* Row 4: Top 5 Lowest-Performing Products */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <Bar data={bottomProductsChart} options={horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue", "Revenue", "Product")} />
       </div>
     </div>
   );
