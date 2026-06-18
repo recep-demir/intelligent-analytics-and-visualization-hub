@@ -20,7 +20,7 @@ export function AdminPanel() {
   const fetchUsers = async () => {
     try {
       // 🔑 Dynamically extract the latest token from storage on every request life-cycle
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
 
       const response = await fetch(`${API_URL}/api/admin/users`, {
         headers: {
@@ -47,7 +47,7 @@ export function AdminPanel() {
 
     try {
       // 🔑 Dynamically extract the latest token to prevent stale credentials
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
 
       const response = await fetch(`${API_URL}/api/admin/users`, {
         method: "POST",
@@ -79,7 +79,7 @@ export function AdminPanel() {
   const handleRoleUpdate = async (userId: string, newRole: string) => {
     try {
       // 🔑 Dynamically extract authorization credentials
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
 
       const response = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
         method: "PATCH",
