@@ -1,5 +1,5 @@
 import { AIEngine } from "../../../../shared/types/ai";
-import { ChartConfig, ChartType, GroupByValue } from "../../../../shared/types/chart";
+import { ChartConfig, ChartType, GroupByValue, Metric } from "../../../../shared/types/chart";
 
 // Rule-based fallback engine — no external API, no cost, works offline
 // Handles predictable patterns only. Use GeminiEngine for complex queries.
@@ -7,6 +7,7 @@ export class LocalEngine implements AIEngine {
   async resolve(nl: string, _schemaSdl: string): Promise<ChartConfig> {
     const q = nl.toLowerCase();
 
+    const metric = this.detectMetric(q);
     return {
       chartType: this.detectChartType(q),
       dataset: this.detectDataset(q),
@@ -14,6 +15,7 @@ export class LocalEngine implements AIEngine {
       groupBy: this.detectGroupBy(q),
       title: nl,
       limit: this.detectLimit(q),
+      ...(metric ? { metric } : {}),
     };
   }
 
@@ -27,6 +29,7 @@ export class LocalEngine implements AIEngine {
     if (q.includes("treemap") || q.includes("tree chart")) return "treemap";
     if (q.includes("table") || q.includes("list"))         return "grid";
     if (q.includes("map"))                                 return "map";
+    if (q.includes("stat chart") || /\bstat\b/.test(q))  return "stat";
 
     // Stat: single aggregate KPI — no groupBy dimension in the question
     const hasDimension =
@@ -67,9 +70,11 @@ export class LocalEngine implements AIEngine {
     // Status has few distinct values — donut shows proportions better than bar
     if (/ by status\b/i.test(q)) return "donut";
 
-    // Explicit comparison — "by <non-geographic dimension>" or "compare"
-    if (/ by (category|product|region)\b/i.test(q) ||
-        /\b(compare|comparison|ranking|rank)\b/.test(q)) return "bar";
+    // Explicit comparison keywords always imply bar. Dimension-based routing
+    // (category/productGroup/product/province/status) is left to the more specific,
+    // superlative-aware blocks below — matching this here would short-circuit them
+    // (e.g. "by category" or "by product group" with no ranking should fall through to treemap).
+    if (/\b(compare|comparison|ranking|rank)\b/.test(q)) return "bar";
 
     // Province queries: ranking/superlative → bar; geographic overview → map
     if (/\bprovince[s]?\b/i.test(q)) {
@@ -202,6 +207,17 @@ export class LocalEngine implements AIEngine {
     if (/\b(lowest|least|smallest|fewest|worst)\b/.test(q)) return 1;
 
     return undefined;
+  }
+
+  private detectMetric(q: string): Metric | undefined {
+    const hasRevenue = /\b(revenue|subtotal|sales)\b/.test(q)
+    const hasTax     = /\b(taxes|tax\s+(?:amount|collected|paid|revenue))\b/.test(q) ||
+                       (/\btax\b/.test(q) && !/\btax\s+(?:year|rate|code|bracket)\b/.test(q))
+    const hasJoin    = /\b(vs\.?|versus|alongside|compare|both|and)\b/.test(q)
+    if (hasRevenue && hasTax && hasJoin) return 'both'
+    if (hasTax) return 'tax'
+    if (/\b(grand total|total amount|total charged|total bill|total paid|gross total)\b/.test(q)) return 'total'
+    return undefined
   }
 
   private toTitleCase(str: string): string {
