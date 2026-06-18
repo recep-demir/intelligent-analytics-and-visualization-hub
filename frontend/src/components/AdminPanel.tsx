@@ -14,14 +14,17 @@ export function AdminPanel() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // TA3: States for controlling the deletion confirmation modal and success toast
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   const API_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:4000";
 
   // 🔄 1. Fetch All Active System Users (GET /api/admin/users)
   const fetchUsers = async () => {
     try {
-      // 🔑 Dynamically extract the latest token from storage on every request life-cycle
       const token = sessionStorage.getItem("token");
-
       const response = await fetch(`${API_URL}/api/admin/users`, {
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -46,9 +49,7 @@ export function AdminPanel() {
     setLoading(true);
 
     try {
-      // 🔑 Dynamically extract the latest token to prevent stale credentials
       const token = sessionStorage.getItem("token");
-
       const response = await fetch(`${API_URL}/api/admin/users`, {
         method: "POST",
         headers: {
@@ -78,9 +79,7 @@ export function AdminPanel() {
   // 🔄 3. Modify Existing User Security Role (PATCH /api/admin/users/:id/role)
   const handleRoleUpdate = async (userId: string, newRole: string) => {
     try {
-      // 🔑 Dynamically extract authorization credentials
       const token = sessionStorage.getItem("token");
-
       const response = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
         method: "PATCH",
         headers: {
@@ -91,15 +90,58 @@ export function AdminPanel() {
       });
 
       if (!response.ok) throw new Error("Failed to update role.");
-      
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole as any } : u));
     } catch (err) {
       alert("🔴 You do not have permission to update roles or an error occurred.");
     }
   };
 
+  // TA3: Trigger function to open the confirmation modal for a specific user
+  const openDeleteModal = (user: User) => {
+    setUserToDelete(user);
+    setIsModalOpen(true);
+  };
+
+  // TA3: Core function executing the DELETE request to the backend API
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      const token = sessionStorage.getItem("token");
+      const response = await fetch(`${API_URL}/api/admin/users/${userToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Failed to delete user.");
+
+      // AC Requirement: Immediately removes the item from the view
+      setUsers(users.filter(u => u.id !== userToDelete.id));
+      
+      // AC Requirement: Success toast message notification
+      setToastMessage(`🗑️ User ${userToDelete.email} has been successfully deleted.`);
+      setTimeout(() => setToastMessage(null), 3000); 
+
+    } catch (err) {
+      alert("🔴 An error occurred while trying to delete the user.");
+    } finally {
+      setIsModalOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 p-6 space-y-8">
+    <div className="relative min-h-screen bg-gray-900 text-gray-100 p-6 space-y-8">
+      
+      {/* Success Toast Message Notification Container */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl border border-emerald-400 font-medium animate-bounce">
+          {toastMessage}
+        </div>
+      )}
+
       <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
         🛡️ Admin Control Panel - User Access Management
       </h1>
@@ -189,18 +231,28 @@ export function AdminPanel() {
                         {user.role.toUpperCase()}
                       </span>
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right flex items-center justify-end gap-3 h-full whitespace-nowrap">
                       {user.role === "admin" ? (
-                        <span className="text-xs text-gray-500 italic font-mono">Primary Root Admin</span>
+                        <span className="text-xs text-gray-500 italic font-mono py-1">Primary Root Admin</span>
                       ) : (
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
-                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white outline-none cursor-pointer"
-                        >
-                          <option value="viewer">Viewer</option>
-                          <option value="analyst">Analyst</option>
-                        </select>
+                        <>
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
+                            className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white outline-none cursor-pointer"
+                          >
+                            <option value="viewer">Viewer</option>
+                            <option value="analyst">Analyst</option>
+                          </select>
+
+                          {/* TA3: Action invocation button for user deletion sequence */}
+                          <button
+                            onClick={() => openDeleteModal(user)}
+                            className="bg-red-900/40 hover:bg-red-600 border border-red-700 text-red-200 hover:text-white px-2 py-1 rounded text-xs font-medium transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -210,6 +262,35 @@ export function AdminPanel() {
           </div>
         </div>
       </div>
+
+      {/* 🛡️ TA3: Acceptance Criteria - Overlay Confirmation Modal */}
+      {isModalOpen && userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-gray-800 border border-gray-700 w-full max-w-md rounded-xl p-6 shadow-2xl space-y-4 mx-4">
+            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+              ⚠️ Confirm User Deletion
+            </h3>
+            <p className="text-sm text-gray-300">
+              Are you absolutely sure you want to delete <span className="text-white font-semibold underline">{userToDelete.email}</span>? This action is permanent and cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setIsModalOpen(false); setUserToDelete(null); }}
+                className="bg-gray-700 hover:bg-gray-600 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-red-900/30"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
