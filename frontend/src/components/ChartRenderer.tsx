@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -22,7 +21,7 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 );
 
 const PALETTE = [
@@ -62,7 +61,9 @@ interface Props {
 export function ChartRenderer({ config, data }: Props) {
   if (!data.labels.length) {
     return (
-      <p className="text-gray-500 text-center">No data available for this query.</p>
+      <p className="text-gray-500 text-center">
+        No data available for this query.
+      </p>
     );
   }
 
@@ -89,7 +90,11 @@ export function ChartRenderer({ config, data }: Props) {
     responsive: true,
     plugins: {
       legend: { position: "top" as const, labels: { color: "#d1d5db" } },
-      title: { display: !!config.title, text: config.title ?? "", color: "#d1d5db" },
+      title: {
+        display: !!config.title,
+        text: config.title ?? "",
+        color: "#d1d5db",
+      },
     },
   };
 

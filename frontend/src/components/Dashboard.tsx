@@ -13,7 +13,7 @@ import type {
   LineDataset,
   BarDataset,
 } from "../types/dashboard";
-import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
+import { CHART_COLORS } from "../constants/chartTheme";
 import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
 
 function fmtRev(v: number): string {
@@ -89,7 +89,11 @@ export function Dashboard({
     setShareUrl(null);
     setFilters((prev) => {
       const next = { ...prev, [key]: value };
-      if (next.yearFrom && next.yearTo && next.yearFrom > next.yearTo) {
+      if (
+        next.yearFrom !== null &&
+        next.yearTo !== null &&
+        next.yearFrom > next.yearTo
+      ) {
         next.yearTo = next.yearFrom;
       }
       return next;
