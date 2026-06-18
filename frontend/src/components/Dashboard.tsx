@@ -373,6 +373,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
                     stepSize: 1,
                     font: { size: 9 },
                     maxRotation: 0,
+                    autoSkip: false,
                     callback: (val) => {
                       const label = bubbleTickLabels.current[val as number];
                       if (!label) return "";
