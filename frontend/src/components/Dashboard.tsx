@@ -84,22 +84,27 @@ export function Dashboard({
   const { categories, provinces, statuses, years } = useFilterOptions();
 
   function set(key: keyof DashboardFilters, raw: string) {
-    const isYear = key === "yearFrom" || key === "yearTo";
-    const value = raw === "" ? null : isYear ? Number(raw) : raw;
     setShareUrl(null);
 
     setFilters((prev) => {
-      // 1. Shallow copy the previous filters object
-      const next = { ...prev };
+      // 1. Handle parsing the raw string into the correct type based on the key
+      const isYear = key === "yearFrom" || key === "yearTo";
+      let parsedValue: string | number | null = raw;
 
-      // 2. Direct bracket notation assignment using 'any' cast to shut down type mismatch warnings
-      (next as any)[key] = value;
+      if (raw === "") {
+        parsedValue = null;
+      } else if (isYear) {
+        parsedValue = Number(raw);
+      }
+
+      // 2. Create the new state object safely
+      const next: DashboardFilters = { ...prev, [key]: parsedValue };
 
       // 3. Keep your year validation logic safe and sound
       if (
-        next.yearFrom &&
-        next.yearTo &&
-        Number(next.yearFrom) > Number(next.yearTo)
+        next.yearFrom !== null &&
+        next.yearTo !== null &&
+        next.yearFrom > next.yearTo
       ) {
         next.yearTo = next.yearFrom;
       }
