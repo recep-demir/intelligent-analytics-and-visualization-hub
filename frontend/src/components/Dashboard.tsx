@@ -124,6 +124,16 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.topProvinces]);
 
+  const bottomProductsChart = useMemo((): ChartDataShape<BarDataset> => ({
+    labels: data?.bottomProducts.map(p => p.name) ?? [],
+    datasets: [{
+      label:           "Revenue",
+      data:            data?.bottomProducts.map(p => p.revenue) ?? [],
+      backgroundColor: CHART_COLORS,
+      borderRadius:    4,
+    }],
+  }), [data?.bottomProducts]);
+
   const mapData = useMemo(
     () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
     [data?.topProvinces],
@@ -282,6 +292,13 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
           <div className="relative h-64 md:h-96">
             <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
           </div>
+        </div>
+      </div>
+
+      {/* Row 3: Bottom products */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <div className="relative h-64 md:h-80">
+          <Bar data={bottomProductsChart} options={{ ...horizontalBarOptions("Top 5 Lowest-Performing Products by Revenue", "Revenue", "Product"), maintainAspectRatio: false }} />
         </div>
       </div>
 
