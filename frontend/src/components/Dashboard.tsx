@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Bar, Line } from "react-chartjs-2";
+import { Bar, Line, Pie } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
@@ -94,13 +94,13 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.yearlyRevenue]);
 
-  const ordersByStatusChart = useMemo((): ChartDataShape<BarDataset> => ({
+  const ordersByStatusChart = useMemo(() => ({
     labels: data?.ordersByStatus.map(s => s.status) ?? [],
     datasets: [{
-      label:           "Order Count",
       data:            data?.ordersByStatus.map(s => s.count) ?? [],
       backgroundColor: CHART_COLORS,
-      borderRadius:    4,
+      borderWidth:     2,
+      borderColor:     "#1f2937",
     }],
   }), [data?.ordersByStatus]);
 
@@ -263,9 +263,10 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
             <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
           </div>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-          <div className="relative h-64 md:h-96">
-            <Bar data={ordersByStatusChart} options={{ ...baseChartOptions("Order Volume by Status", "Order Status", "Count"), maintainAspectRatio: false }} />
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center">
+          <p className="text-sm font-medium text-gray-400 mb-3 self-start">Order Volume by Status</p>
+          <div className="relative h-64 md:h-80 w-full flex items-center justify-center">
+            <Pie data={ordersByStatusChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: "#d1d5db", padding: 16 } } } }} />
           </div>
         </div>
       </div>
