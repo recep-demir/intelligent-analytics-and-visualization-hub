@@ -112,3 +112,46 @@ describe("normalize — treemap+both no longer silently coerced to bar", () => {
     expect(resolved.metric).toBe("both");
   });
 });
+
+describe("normalize — deterministic status-filter detection", () => {
+  it("detects 'shipping' as distinct from 'shipped'", () => {
+    const resolved = normalize(config(), "show me revenue for shipping orders");
+    const statusValues = resolved.filters.filter(f => f.field === "status").map(f => f.value);
+    expect(statusValues).toEqual(["shipping"]);
+  });
+
+  it("detects 'payment' as distinct from 'paid'", () => {
+    const resolved = normalize(config(), "show me revenue for payment orders");
+    const statusValues = resolved.filters.filter(f => f.field === "status").map(f => f.value);
+    expect(statusValues).toEqual(["payment"]);
+  });
+
+  it("does not treat 'paid' in 'paid taxes' as a status filter", () => {
+    const resolved = normalize(
+      config({ metric: "tax" }),
+      "show me paid taxes by province",
+    );
+    const statusValues = resolved.filters.filter(f => f.field === "status").map(f => f.value);
+    expect(statusValues).toEqual([]);
+  });
+
+  it("still detects 'paid' as a status when not modifying tax", () => {
+    const resolved = normalize(config(), "show me revenue for paid orders");
+    const statusValues = resolved.filters.filter(f => f.field === "status").map(f => f.value);
+    expect(statusValues).toEqual(["paid"]);
+  });
+
+  it("overrides an AI-provided status filter that doesn't match the question text", () => {
+    const resolved = normalize(
+      config({ filters: [{ field: "status", operator: "eq", value: "cancelled" }] }),
+      "show me revenue for shipped orders",
+    );
+    const statusValues = resolved.filters.filter(f => f.field === "status").map(f => f.value);
+    expect(statusValues).toEqual(["shipped"]);
+  });
+
+  it("produces no status filter when none is mentioned", () => {
+    const resolved = normalize(config(), "show me revenue by province");
+    expect(resolved.filters.some(f => f.field === "status")).toBe(false);
+  });
+});

@@ -10,7 +10,10 @@ const FIELD_SQL: Record<string, string> = {
   year:     "strftime('%Y', o.createdAt)",
   month:    "strftime('%m', o.createdAt)",
   province: 'a.province',
-  country:  'a.country',
+  // LOWER() matches the dashboard's equivalent filter (LOWER(a.country) = 'ca') — the
+  // injected default value is always lowercase, but this guards against mixed-case data
+  // ever causing the AI Assistant and dashboard to silently diverge again.
+  country:  'LOWER(a.country)',
   status:   'o.status',
   tax:      'o.tax',
   subtotal: 'o.subtotal',

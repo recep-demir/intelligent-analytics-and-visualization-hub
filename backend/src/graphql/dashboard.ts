@@ -92,7 +92,6 @@ function buildWhereClause(conditions: string[]): string {
 
 function buildOrderLevelWhere(
   args: DashboardStatsArgs,
-  options: { useMonthlyRevenueDefaults?: boolean } = {},
 ): { where: string; replacements: SqlReplacements } {
   const conditions: string[] = ["LOWER(a.country) = 'ca'"];
   const replacements = buildReplacements(args);
@@ -132,29 +131,21 @@ function buildOrderLevelWhere(
   };
 }
 
-function needsOrderJoin(args: DashboardStatsArgs, applyStatusDefault = false): boolean {
-  return applyStatusDefault || hasYear(args.year) || hasYear(args.yearFrom) || hasYear(args.yearTo) || hasText(args.status) || hasText(args.province);
-}
-
-function buildItemOrderJoins(args: DashboardStatsArgs, applyStatusDefault = false): string {
-  if (!needsOrderJoin(args, applyStatusDefault)) return "";
-
+// Always joins Orders+Addresses — buildItemConditions() always includes a country
+// condition referencing the Addresses alias, so the join is structurally required
+// regardless of which other filters are present.
+function buildItemOrderJoins(): string {
   return `
     JOIN Orders o ON oi.orderId = o.id
     LEFT JOIN Addresses a ON o.addressId = a.id
   `;
 }
 
-function buildItemConditions(
-  args: DashboardStatsArgs,
-  options: { applyStatusDefault?: boolean } = {},
-): string[] {
+function buildItemConditions(args: DashboardStatsArgs): string[] {
   const conditions: string[] = ["LOWER(a.country) = 'ca'"];
 
   if (hasText(args.status)) {
     conditions.push("LOWER(o.status) = LOWER(:status)");
-  } else if (options.applyStatusDefault) {
-    conditions.push("o.status IN ('paid','shipped')");
   }
 
   if (hasYear(args.year)) {
@@ -174,7 +165,7 @@ function buildItemConditions(
 async function fetchTaxSummary(
   args: DashboardStatsArgs,
 ): Promise<{ grossRevenue: number; netSales: number; totalTaxCollected: number }> {
-  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+  const { where, replacements } = buildOrderLevelWhere(args);
 
   const [rows] = await sequelize.query(
     `
@@ -200,7 +191,7 @@ async function fetchTaxSummary(
 async function fetchYearlyRevenue(
   args: DashboardStatsArgs,
 ): Promise<{ year: string; revenue: number }[]> {
-  const { where, replacements } = buildOrderLevelWhere(args, { useMonthlyRevenueDefaults: true });
+  const { where, replacements } = buildOrderLevelWhere(args);
 
   const [rows] = await sequelize.query(
     `
@@ -251,9 +242,7 @@ async function fetchMonthlyRevenue(
     return rows as { month: string; revenue: number }[];
   }
 
-  const { where, replacements } = buildOrderLevelWhere(args, {
-    useMonthlyRevenueDefaults: true,
-  });
+  const { where, replacements } = buildOrderLevelWhere(args);
 
   const [rows] = await sequelize.query(
     `
@@ -292,9 +281,9 @@ async function fetchOrdersByStatus(
 async function fetchTopProductGroups(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const conditions = buildItemConditions(args);
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args, true);
+  const orderJoins = buildItemOrderJoins();
 
   if (hasText(args.category)) {
     conditions.push(`
@@ -352,9 +341,9 @@ async function fetchTopProvinces(
 async function fetchCategoryRevenue(
   args: DashboardStatsArgs,
 ): Promise<{ category: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const conditions = buildItemConditions(args);
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args, true);
+  const orderJoins = buildItemOrderJoins();
 
   if (hasText(args.category)) {
     conditions.push("LOWER(pc.name) = LOWER(:category)");
@@ -383,9 +372,9 @@ async function fetchCategoryRevenue(
 async function fetchTopProducts(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const conditions = buildItemConditions(args);
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args, true);
+  const orderJoins = buildItemOrderJoins();
 
   if (hasText(args.category)) {
     conditions.push(`
@@ -421,9 +410,9 @@ async function fetchTopProducts(
 async function fetchBottomProducts(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const conditions = buildItemConditions(args);
   const replacements = buildReplacements(args);
-  const orderJoins = buildItemOrderJoins(args, true);
+  const orderJoins = buildItemOrderJoins();
 
   if (hasText(args.category)) {
     conditions.push(`
