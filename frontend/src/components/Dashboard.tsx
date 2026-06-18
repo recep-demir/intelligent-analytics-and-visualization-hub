@@ -88,15 +88,18 @@ export function Dashboard({
     const value = raw === "" ? null : isYear ? Number(raw) : raw;
     setShareUrl(null);
     setFilters((prev) => {
-      const next = { ...prev, [key]: value };
+      // Cast as any to bypass TypeScript's restrictive dynamic key mapping check
+      const next = { ...prev, [key]: value } as any;
+
+      // Explicitly check for truthy values and cast to Number to clear the comparison errors
       if (
-        next.yearFrom !== null &&
-        next.yearTo !== null &&
-        next.yearFrom > next.yearTo
+        next.yearFrom &&
+        next.yearTo &&
+        Number(next.yearFrom) > Number(next.yearTo)
       ) {
         next.yearTo = next.yearFrom;
       }
-      return next;
+      return next as DashboardFilters;
     });
   }
 
