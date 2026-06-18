@@ -5,25 +5,27 @@ const CANADA_GEO = "/canada-provinces.json";
 
 const PROVINCE_LABELS: {
   province: string;
+  abbr: string;
   capital: string;
-  coords: [number, number];
+  capitalCoords: [number, number];
+  centroid: [number, number];
   anchor: "middle" | "start" | "end";
   dx: number;
   dy: number;
 }[] = [
-  { province: "British Columbia",          capital: "Victoria",       coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
-  { province: "Alberta",                   capital: "Edmonton",       coords: [-113.49, 53.55], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Saskatchewan",              capital: "Regina",         coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Manitoba",                  capital: "Winnipeg",       coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Ontario",                   capital: "Toronto",        coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Quebec",                    capital: "Quebec City",    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
-  { province: "New Brunswick",             capital: "Fredericton",    coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
-  { province: "Nova Scotia",               capital: "Halifax",        coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
-  { province: "Prince Edward Island",      capital: "Charlottetown",  coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
-  { province: "Newfoundland and Labrador", capital: "St. John's",     coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Yukon",                     capital: "Whitehorse",     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Northwest Territories",     capital: "Yellowknife",    coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Nunavut",                   capital: "Iqaluit",        coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "British Columbia",          abbr: "BC",  capital: "Victoria",       capitalCoords: [-123.37, 48.43], centroid: [-124.5, 53.5],  anchor: "end",    dx: -3, dy: -4 },
+  { province: "Alberta",                   abbr: "AB",  capital: "Edmonton",       capitalCoords: [-113.49, 53.55], centroid: [-114.5, 55.0],  anchor: "middle", dx:  0, dy: -4 },
+  { province: "Saskatchewan",              abbr: "SK",  capital: "Regina",         capitalCoords: [-104.62, 50.45], centroid: [-106.0, 54.0],  anchor: "middle", dx:  0, dy: -4 },
+  { province: "Manitoba",                  abbr: "MB",  capital: "Winnipeg",       capitalCoords: [ -97.14, 49.90], centroid: [ -98.0, 55.0],  anchor: "middle", dx:  0, dy: -4 },
+  { province: "Ontario",                   abbr: "ON",  capital: "Toronto",        capitalCoords: [ -79.38, 43.65], centroid: [ -86.0, 49.5],  anchor: "start",  dx:  3, dy: -4 },
+  { province: "Quebec",                    abbr: "QC",  capital: "Quebec City",    capitalCoords: [ -71.21, 46.81], centroid: [ -70.0, 52.5],  anchor: "end",    dx: -4, dy: -3 },
+  { province: "New Brunswick",             abbr: "NB",  capital: "Fredericton",    capitalCoords: [ -66.64, 45.96], centroid: [ -66.3, 46.5],  anchor: "start",  dx:  4, dy:  6 },
+  { province: "Nova Scotia",               abbr: "NS",  capital: "Halifax",        capitalCoords: [ -63.58, 44.65], centroid: [ -63.0, 45.2],  anchor: "start",  dx:  4, dy:  7 },
+  { province: "Prince Edward Island",      abbr: "PEI", capital: "Charlottetown",  capitalCoords: [ -63.13, 46.24], centroid: [ -63.3, 46.4],  anchor: "end",    dx: -4, dy:  6 },
+  { province: "Newfoundland and Labrador", abbr: "NL",  capital: "St. John's",     capitalCoords: [ -52.71, 47.56], centroid: [ -57.0, 53.5],  anchor: "start",  dx:  3, dy: -4 },
+  { province: "Yukon",                     abbr: "YT",  capital: "Whitehorse",     capitalCoords: [-135.06, 60.72], centroid: [-135.5, 63.0],  anchor: "start",  dx:  3, dy: -4 },
+  { province: "Northwest Territories",     abbr: "NT",  capital: "Yellowknife",    capitalCoords: [-114.37, 62.45], centroid: [-119.0, 65.5],  anchor: "middle", dx:  0, dy: -4 },
+  { province: "Nunavut",                   abbr: "NU",  capital: "Iqaluit",        capitalCoords: [ -68.52, 63.75], centroid: [ -85.0, 70.0],  anchor: "end",    dx: -3, dy: -4 },
 ];
 
 function normalizeProvince(s: string): string {
@@ -158,8 +160,9 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                   })
                 }
               </Geographies>
-              {PROVINCE_LABELS.map(({ province, capital, coords, anchor, dx, dy }) => (
-                <Marker key={province} coordinates={coords}>
+              {/* Capital city dots */}
+              {PROVINCE_LABELS.map(({ province, capital, capitalCoords }) => (
+                <Marker key={`cap-${province}`} coordinates={capitalCoords}>
                   <circle
                     r={2.5}
                     fill="#ffffff"
@@ -177,13 +180,19 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     }}
                     onMouseLeave={() => setTooltip(null)}
                   />
+                </Marker>
+              ))}
+
+              {/* Province abbreviation labels at centroid */}
+              {PROVINCE_LABELS.map(({ province, abbr, centroid }) => (
+                <Marker key={`lbl-${province}`} coordinates={centroid}>
+                  <rect x={-10} y={-8} width={20} height={11} rx={3} fill="#0d1117" fillOpacity={0.55} />
                   <text
-                    textAnchor={anchor}
-                    x={dx}
-                    y={dy}
-                    style={{ fontSize: "7px", fill: "#d1d5db", fontFamily: "sans-serif", pointerEvents: "none" }}
+                    textAnchor="middle"
+                    y={1}
+                    style={{ fontSize: "8px", fontWeight: "700", fill: "#f9fafb", fontFamily: "sans-serif", letterSpacing: "0.05em", pointerEvents: "none" }}
                   >
-                    {capital}
+                    {abbr}
                   </text>
                 </Marker>
               ))}
