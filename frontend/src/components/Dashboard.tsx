@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Bar, Line, Pie, Bubble } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
@@ -7,6 +7,39 @@ import { useFilterOptions } from "../hooks/useFilterOptions";
 import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
+
+function fmtRev(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
+const bubbleLabelPlugin = {
+  id: "productBubbleLabels",
+  afterDatasetsDraw(chart: any) {
+    const ctx = chart.ctx as CanvasRenderingContext2D;
+    ctx.save();
+    chart.data.datasets.forEach((dataset: any, dsIdx: number) => {
+      chart.getDatasetMeta(dsIdx).data.forEach((point: any, j: number) => {
+        const raw = dataset.data[j] as any;
+        const { x, y } = point;
+        const r: number = point.options?.radius ?? 14;
+        const name: string = raw.name ?? "";
+        const truncated = name.length > 15 ? name.slice(0, 14) + "…" : name;
+
+        ctx.textAlign = "center";
+        ctx.font = "bold 9px sans-serif";
+        ctx.fillStyle = "#f9fafb";
+        ctx.fillText(truncated, x, y - r - 5);
+
+        ctx.font = "8px sans-serif";
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText(fmtRev(Number(raw.y)), x, y + r + 10);
+      });
+    });
+    ctx.restore();
+  },
+};
 
 function formatCurrency(value: number): string {
   return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
@@ -124,37 +157,32 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.topProvinces]);
 
+  const bubbleTickLabels = useRef<Record<number, string>>({});
+
   const productBubbleChart = useMemo(() => {
-    const allRevenues = [
-      ...(data?.topProducts.map(p => p.revenue) ?? []),
-      ...(data?.bottomProducts.map(p => p.revenue) ?? []),
-    ];
-    const maxRev = allRevenues.length ? Math.max(...allRevenues) : 1;
-    const toRadius = (rev: number) => Math.max(6, Math.round((rev / maxRev) * 30));
+    const topProds    = data?.topProducts    ?? [];
+    const bottomProds = data?.bottomProducts ?? [];
+
+    const labels: Record<number, string> = {};
+    topProds.forEach((p, i)    => { labels[i]     = p.name; });
+    bottomProds.forEach((p, i) => { labels[i + 6] = p.name; });
+    bubbleTickLabels.current = labels;
 
     return {
       datasets: [
         {
           label: "Top 5 Products",
-          data: (data?.topProducts ?? []).map((p, i) => ({
-            x: i + 1,
-            y: p.revenue,
-            r: toRadius(p.revenue),
-            name: p.name,
-          })),
+          data: topProds.map((p, i) => ({ x: i, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
           backgroundColor: "rgba(34, 197, 94, 0.7)",
           borderColor: "rgba(34, 197, 94, 1)",
+          borderWidth: 1.5,
         },
         {
           label: "Bottom 5 Products",
-          data: (data?.bottomProducts ?? []).map((p, i) => ({
-            x: i + 1,
-            y: p.revenue,
-            r: toRadius(p.revenue),
-            name: p.name,
-          })),
+          data: bottomProds.map((p, i) => ({ x: i + 6, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
           backgroundColor: "rgba(239, 68, 68, 0.7)",
           borderColor: "rgba(239, 68, 68, 1)",
+          borderWidth: 1.5,
         },
       ],
     };
@@ -324,38 +352,55 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       {/* Row 3: Top vs Bottom products bubble */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
         <p className="text-sm font-medium text-gray-400 mb-3">Top 5 vs Bottom 5 Products by Revenue</p>
-        <div className="relative h-72 md:h-96">
+        <div className="relative h-80 md:h-[26rem]">
           <Bubble
             data={productBubbleChart}
+            plugins={[bubbleLabelPlugin]}
             options={{
               maintainAspectRatio: false,
+              layout: { padding: { top: 36, bottom: 8 } },
               plugins: {
                 legend: { position: "top", labels: { color: "#d1d5db", padding: 16 } },
                 tooltip: {
                   callbacks: {
                     label: ctx => {
-                      const raw = ctx.raw as { x: number; y: number; r: number; name: string };
-                      return `${raw.name}: $${raw.y.toLocaleString()}`;
+                      const raw = ctx.raw as { x: number; y: number; name: string };
+                      return `${raw.name}: ${fmtRev(raw.y)}`;
                     },
                   },
                 },
               },
               scales: {
                 x: {
-                  title: { display: true, text: "Rank (1 = best or worst)", color: "#9ca3af" },
-                  ticks: { color: "#9ca3af", stepSize: 1 },
+                  min: -0.8,
+                  max: 10.8,
+                  ticks: {
+                    color: "#9ca3af",
+                    stepSize: 1,
+                    font: { size: 9 },
+                    maxRotation: 35,
+                    callback: (val) => {
+                      const label = bubbleTickLabels.current[val as number];
+                      if (!label) return "";
+                      return label.length > 12 ? label.slice(0, 11) + "…" : label;
+                    },
+                  },
                   grid: { color: "#374151" },
                 },
                 y: {
-                  title: { display: true, text: "Revenue (CAD)", color: "#9ca3af" },
-                  ticks: { color: "#9ca3af", callback: (v) => `$${Number(v).toLocaleString()}` },
+                  type: "logarithmic",
+                  title: { display: true, text: "Revenue (CAD) — log scale", color: "#9ca3af" },
+                  ticks: {
+                    color: "#9ca3af",
+                    callback: (v) => fmtRev(Number(v)),
+                  },
                   grid: { color: "#374151" },
                 },
               },
             }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">Bubble size = relative revenue · Green = top performers · Red = lowest performers</p>
+        <p className="text-xs text-gray-500 mt-2 text-center">Green = top 5 performers · Red = bottom 5 · Gap separates the two groups · Log scale makes both visible</p>
       </div>
 
     </div>
