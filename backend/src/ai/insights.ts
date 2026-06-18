@@ -250,7 +250,7 @@ function heatmapInsights(data: DataRow[], q: ResolvedQuery): string[] {
   if (topDim1.length >= 2) {
     const [n1, v1] = topDim1[0];
     const [n2, v2] = topDim1[1];
-    const label = agg === "count" ? "orders" : "revenue";
+    const label = metricLabel(q);
     const dim1Plural: Record<string, string> = {
       category: "categories", status: "statuses",
       province: "provinces", productGroup: "product groups", product: "products",
@@ -275,6 +275,20 @@ function heatmapInsights(data: DataRow[], q: ResolvedQuery): string[] {
   }
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Gemini sometimes ignores the "call it tax/grand total" prompt instruction and
+// reverts to "revenue" out of training bias — the same class of drift seen in
+// chart-type/metric resolution elsewhere in this pipeline. Validate the
+// generated text deterministically instead of trusting the prompt alone.
+// ---------------------------------------------------------------------------
+function mentionsWrongMetric(bullets: string[], metric: ResolvedQuery["metric"]): boolean {
+  const text = bullets.join(" ").toLowerCase()
+  if (metric === "tax")   return /\brevenue\b/.test(text)
+  if (metric === "total") return /\brevenue\b/.test(text) && !/\bgrand total\b/.test(text)
+  if (!metric)            return /\btax\b/.test(text)
+  return false
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +380,8 @@ export async function generateInsights(
       case "heatmap":
         if (geminiApiKey) {
           const ai = await geminiInsights(chartType, data, question, geminiApiKey, resolved).catch(() => []);
-          return ai.length > 0 ? ai : heatmapInsights(data, resolved);
+          if (ai.length > 0 && !mentionsWrongMetric(ai, resolved.metric)) return ai;
+          return heatmapInsights(data, resolved);
         }
         return heatmapInsights(data, resolved);
 
@@ -404,7 +419,8 @@ export async function generateInsights(
           : barInsights(data, resolved, question);
         if (geminiApiKey) {
           const ai = await geminiInsights(chartType, data, question, geminiApiKey, resolved).catch(() => []);
-          return ai.length > 0 ? ai : lineFallback;
+          if (ai.length > 0 && !mentionsWrongMetric(ai, resolved.metric)) return ai;
+          return lineFallback;
         }
         return lineFallback;
       }
