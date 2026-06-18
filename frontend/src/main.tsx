@@ -5,10 +5,12 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  LogarithmicScale,
   BarElement,
   LineElement,
   PointElement,
   ArcElement,
+  BubbleController,
   Title,
   Tooltip,
   Legend,
@@ -20,8 +22,8 @@ import './index.css'
 import App from './App.tsx'
 
 ChartJS.register(
-  CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
+  CategoryScale, LinearScale, LogarithmicScale, BarElement, LineElement,
+  PointElement, ArcElement, BubbleController, Title, Tooltip, Legend, Filler,
   TreemapController, TreemapElement,
   MatrixController, MatrixElement,
 )

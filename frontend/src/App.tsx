@@ -12,6 +12,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { SharedDashboardView } from "./components/SharedDashboardView";
 import "./index.css";
 import { Bar, Line, Pie, Doughnut, Chart } from "react-chartjs-2";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import { CHART_COLORS } from "./constants/chartTheme";
 
 const CANADA_GEO = "/canada-provinces.json";
@@ -106,6 +107,7 @@ interface ChartConfig {
   groupBy2?: string;
   title?: string;
   aggregation?: string;
+  metric?: "subtotal" | "tax" | "total" | "both";
 }
 
 interface NLQueryResponse {
@@ -127,7 +129,7 @@ function heatColor(t: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-function formatVal(v: number, aggregation?: string): string {
+function formatVal(v: number, aggregation?: string, compact = false): string {
   if (aggregation === "count") {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
     if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
@@ -135,7 +137,13 @@ function formatVal(v: number, aggregation?: string): string {
   }
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+  // compact = true for axis ticks: round to integer, no cents
+  if (compact || Number.isInteger(v)) return `$${Math.round(v)}`;
   return `$${Number(v).toFixed(2)}`;
+}
+
+function formatAxis(v: number, aggregation?: string): string {
+  return formatVal(v, aggregation, true);
 }
 
 function VerticalLegend({
@@ -173,22 +181,28 @@ function parseChartConfig(raw: any, fallbackTitle: string): ChartConfig {
     dataset: raw?.dataset ?? raw?.dataSet ?? "",
     filters: raw?.filters ?? [],
     aggregation: raw?.aggregation,
+    metric: raw?.metric,
     title: raw?.title ?? fallbackTitle,
   };
 }
 
 function generateTitle(config: ChartConfig): string {
   const agg = config.aggregation ?? "sum";
+  const metricBase =
+    config.metric === "tax"   ? "Tax" :
+    config.metric === "total" ? "Grand Total" :
+    config.metric === "both"  ? "Revenue & Tax" :
+    "Revenue";
   const metric =
     agg === "count"
       ? "Orders"
       : agg === "avg"
-        ? "Avg. Revenue"
+        ? `Avg. ${metricBase}`
         : agg === "min"
-          ? "Min Revenue"
+          ? `Min ${metricBase}`
           : agg === "max"
-            ? "Max Revenue"
-            : "Revenue";
+            ? `Max ${metricBase}`
+            : metricBase;
 
   const GROUP_LABELS: Record<string, string> = {
     province: "Province",
@@ -311,6 +325,65 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
   }
 
   function renderBar(records: any[]) {
+    const isGrouped = records.length > 0 && "series" in records[0];
+
+    if (isGrouped) {
+      // Grouped bar: pivot {series, name, value} into one dataset per series
+      const seriesNames = [...new Set(records.map((r: any) => r.series as string))];
+      // Order labels by Revenue value DESC so highest-revenue items appear first
+      const revMap = new Map<string, number>(
+        records.filter((r: any) => r.series === seriesNames[0]).map((r: any) => [r.name as string, Number(r.value)])
+      );
+      const labels = [...new Set(records.map((r: any) => r.name as string))]
+        .sort((a, b) => (revMap.get(b) ?? 0) - (revMap.get(a) ?? 0));
+
+      const datasets = seriesNames.map((sName, i) => {
+        const valMap = new Map<string, number>(
+          records.filter((r: any) => r.series === sName).map((r: any) => [r.name as string, Number(r.value)])
+        );
+        return {
+          label: sName,
+          data: labels.map(l => valMap.get(l) ?? 0),
+          backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+          borderRadius: 3,
+        };
+      });
+
+      const height = Math.max(labels.length * 72 + 24, 200);
+      const options = {
+        indexAxis: "y" as const,
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 64 } },
+        plugins: {
+          legend: { display: true, labels: { color: "#94a3b8" } },
+          tooltip: {
+            callbacks: {
+              label: (ctx: any) => `${ctx.dataset.label}: ${formatVal(ctx.parsed.x, agg)}`,
+            },
+          },
+          datalabels: {
+            anchor: "end" as const,
+            align: "end" as const,
+            color: "#94a3b8",
+            font: { size: 11 },
+            display: (ctx: any) => Number(ctx.dataset.data[ctx.dataIndex]) > 0,
+            formatter: (value: number) => formatVal(value, agg),
+          },
+        },
+        scales: {
+          x: { ticks: { color: "#94a3b8", callback: (v: any) => formatAxis(Number(v), agg) }, grid: { color: "#1e293b" } },
+          y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
+        },
+      };
+      return (
+        <div style={{ height }}>
+          <Bar data={{ labels, datasets }} options={options} plugins={[ChartDataLabels]} />
+        </div>
+      );
+    }
+
+    // Single-metric bar (existing behaviour)
     const height = Math.max(records.length * 48 + 24, 200);
     const data = {
       labels: records.map((r: any) => r.name ?? r.label ?? ""),
@@ -324,6 +397,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       indexAxis: "y" as const,
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { right: 64 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -331,10 +405,17 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
             label: (ctx: any) => formatVal(ctx.parsed.x, agg),
           },
         },
+        datalabels: {
+          anchor: "end" as const,
+          align: "end" as const,
+          color: "#94a3b8",
+          font: { size: 12 },
+          formatter: (value: number) => formatVal(value, agg),
+        },
       },
       scales: {
         x: {
-          ticks: { color: "#94a3b8", callback: (v: any) => formatVal(Number(v), agg) },
+          ticks: { color: "#94a3b8", callback: (v: any) => formatAxis(Number(v), agg) },
           grid: { color: "#1e293b" },
         },
         y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
@@ -342,7 +423,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     };
     return (
       <div style={{ height }}>
-        <Bar data={data} options={options} />
+        <Bar data={data} options={options} plugins={[ChartDataLabels]} />
       </div>
     );
   }
@@ -355,8 +436,50 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       return renderStat([{ value: p.value ?? 0, name: p.name ?? p.year }]);
     }
 
+    const tickCallback = (v: any) => formatAxis(Number(v), agg);
+
+    // Multi-series: records carry a 'series' field (e.g. province or status)
+    if ("series" in points[0]) {
+      const seriesNames = [...new Set(points.map((d: any) => d.series as string))].sort();
+      const timeLabels = [...new Set(points.map((d: any) => d.name as string))];
+      const datasets = seriesNames.map((sName, i) => {
+        const rowMap = new Map(
+          points.filter((d: any) => d.series === sName).map((d: any) => [d.name, Number(d.value) || 0])
+        );
+        return {
+          label: sName,
+          data: timeLabels.map(t => rowMap.get(t) ?? 0),
+          borderColor: CHART_COLORS[i % CHART_COLORS.length],
+          backgroundColor: `${CHART_COLORS[i % CHART_COLORS.length]}26`,
+          tension: 0.4,
+          pointRadius: 3,
+          fill: false,
+        };
+      });
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, labels: { color: "#94a3b8" } },
+          tooltip: {
+            callbacks: {
+              label: (ctx: any) => `${ctx.dataset.label}: ${formatVal(ctx.parsed.y, agg)}`,
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
+          y: { ticks: { color: "#94a3b8", callback: tickCallback }, grid: { color: "#1e293b" } },
+        },
+      };
+      return (
+        <div style={{ height: 288 }}>
+          <Line data={{ labels: timeLabels, datasets }} options={options} />
+        </div>
+      );
+    }
+
     const isMinMax = "min" in points[0] && "max" in points[0];
-    const tickCallback = (v: any) => formatVal(Number(v), agg);
 
     if (isMinMax) {
       const data = {
@@ -449,6 +572,20 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
   }
 
   function renderStat(records: any[]) {
+    // Dual-stat: metric=both returns two named rows (Revenue + Tax Collected)
+    if (records.length === 2 && records[0]?.name && records[1]?.name) {
+      return (
+        <div className="w-full flex gap-4 py-6 justify-center">
+          {records.map((r: any) => (
+            <div key={r.name} className="flex-1 flex flex-col items-center gap-2 bg-gray-800/30 rounded-xl p-6">
+              <span className="text-2xl font-black text-white tabular-nums">{formatVal(Number(r.value), agg)}</span>
+              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-300/80">{r.name}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     const val = records[0]?.value ?? 0;
     const label = (records[0]?.name && records[0].name !== String(val))
       ? records[0].name
@@ -491,7 +628,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     if (records.length === 0) return null;
     const cols = Object.keys(records[0]);
     return (
-      <div className="w-full overflow-x-auto max-h-64 rounded-lg">
+      <div className="w-full overflow-auto max-h-[360px] rounded-lg">
         <table className="w-full text-xs font-mono border-collapse">
           <thead className="sticky top-0 bg-gray-900">
             <tr>
@@ -838,15 +975,15 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           </p>
         </div>
       )}
-      {chartData.chartConfig.chartType === "pie" && renderPieOrDonut(chartData.data ?? [], false)}
-      {chartData.chartConfig.chartType === "donut" && renderPieOrDonut(chartData.data ?? [], true)}
-      {chartData.chartConfig.chartType === "bar" && renderBar(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "treemap" && renderTreemap(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "line" && renderLine(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "stat" && renderStat(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "grid" && renderGrid(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "heatmap" && renderHeatmap(chartData.data ?? [])}
-      {chartData.chartConfig.chartType === "map" && renderMap(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "pie" && renderPieOrDonut(chartData.data ?? [], false)}
+      {!chartData.message && chartData.chartConfig.chartType === "donut" && renderPieOrDonut(chartData.data ?? [], true)}
+      {!chartData.message && chartData.chartConfig.chartType === "bar" && renderBar(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "treemap" && renderTreemap(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "line" && renderLine(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "stat" && renderStat(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "grid" && renderGrid(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "heatmap" && renderHeatmap(chartData.data ?? [])}
+      {!chartData.message && chartData.chartConfig.chartType === "map" && renderMap(chartData.data ?? [])}
     </div>
   );
 });
