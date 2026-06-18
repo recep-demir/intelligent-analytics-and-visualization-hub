@@ -589,7 +589,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     const val = records[0]?.value ?? 0;
     const label = (records[0]?.name && records[0].name !== String(val))
       ? records[0].name
-      : (chartData.chartConfig.yAxis ?? "Total");
+      : (chartData.chartConfig.aggregation ?? "Total");
     const data = {
       datasets: [
         {

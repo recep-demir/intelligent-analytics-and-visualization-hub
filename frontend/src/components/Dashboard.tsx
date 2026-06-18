@@ -211,7 +211,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
 
       {/* Filter Bar */}
       {viewerMode ? (
-        <div className="flex flex-wrap gap-2 bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-gray-400 items-center">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4 w-full">
           <span className="font-medium text-gray-500 uppercase tracking-wider mr-1">Filtered by:</span>
           {filters.yearFrom && <span className="bg-gray-700 px-2 py-1 rounded">Year from {filters.yearFrom}</span>}
           {filters.yearTo   && <span className="bg-gray-700 px-2 py-1 rounded">Year to {filters.yearTo}</span>}
@@ -224,7 +224,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
         </div>
       ) : (
         <div className="flex flex-wrap gap-2 sm:gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full lg:w-auto justify-between sm:justify-start">
             <span className="text-xs text-gray-400">Year</span>
             <select className={SELECT_CLS} value={filters.yearFrom ?? ""} onChange={e => set("yearFrom", e.target.value)}>
               <option value="">From</option>
@@ -236,19 +236,22 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-          <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
-            <option value="">All provinces</option>
-            {provinces.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
-            <option value="">All statuses</option>
-            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
-            <option value="">All categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full flex-1">
+            <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
+              <option value="">All provinces</option>
+              {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
+              <option value="">All statuses</option>
+              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
+              <option value="">All categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
         </div>
+        
       )}
 
       {/* KPI Cards */}
@@ -271,14 +274,16 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       </div>
 
       {/* Province Map */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 w-full overflow-x-auto">
         <p className="text-sm font-medium text-gray-400 mb-3">Orders by Province</p>
-        <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
+        <div className="min-w-[300px] w-full">
+            <CanadaMap data={mapData} aggregation="count" legend="Order Count" />
+        </div>
       </div>
 
       {/* Row 1: Line + Order Status Bar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center">
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center w-full overflow-hidden">
           <div className="relative w-full h-64 md:h-96">
             <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
           </div>
