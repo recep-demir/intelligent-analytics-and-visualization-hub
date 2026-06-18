@@ -3,15 +3,22 @@ import { Bar, Line, Pie, Bubble } from "react-chartjs-2";
 import type { Chart, BubbleDataPoint, PointElement } from "chart.js";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
-import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
+import {
+  useDashboardStats,
+  type DashboardFilters,
+} from "../hooks/useDashboardStats";
 import { useFilterOptions } from "../hooks/useFilterOptions";
-import type { ChartDataShape, LineDataset, BarDataset } from "../types/dashboard";
+import type {
+  ChartDataShape,
+  LineDataset,
+  BarDataset,
+} from "../types/dashboard";
 import { CHART_COLORS, DOUGHNUT_COLORS } from "../constants/chartTheme";
 import { baseChartOptions, horizontalBarOptions } from "../utils/chartOptions";
 
 function fmtRev(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}K`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
   return `$${v.toFixed(0)}`;
 }
 
@@ -42,32 +49,45 @@ const bubbleLabelPlugin = {
 };
 
 function formatCurrency(value: number): string {
-  return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${value.toFixed(0)}`;
+  return value >= 1000
+    ? `${(value / 1000).toFixed(1)}K`
+    : `${value.toFixed(0)}`;
 }
 
-const SELECT_CLS = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
+const SELECT_CLS =
+  "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer";
 
-export function Dashboard({ initialFilters, viewerMode = false , canShare = false}: {
+export function Dashboard({
+  initialFilters,
+  viewerMode = false,
+  canShare = false,
+}: {
   initialFilters?: DashboardFilters;
   viewerMode?: boolean;
   canShare?: boolean;
 }) {
   const [filters, setFilters] = useState<DashboardFilters>(
-    initialFilters ?? { yearFrom: null, yearTo: null, province: null, status: null, category: null }
+    initialFilters ?? {
+      yearFrom: null,
+      yearTo: null,
+      province: null,
+      status: null,
+      category: null,
+    },
   );
   useEffect(() => {
-  if (initialFilters) {
-    setFilters(initialFilters);
-  }
-}, [initialFilters]);
+    if (initialFilters) {
+      setFilters(initialFilters);
+    }
+  }, [initialFilters]);
   const { data, loading, error } = useDashboardStats(filters);
   const { categories, provinces, statuses, years } = useFilterOptions();
 
   function set(key: keyof DashboardFilters, raw: string) {
     const isYear = key === "yearFrom" || key === "yearTo";
     const value = raw === "" ? null : isYear ? Number(raw) : raw;
-    setShareUrl(null);   
-    setFilters(prev => {
+    setShareUrl(null);
+    setFilters((prev) => {
       const next = { ...prev, [key]: value };
       if (next.yearFrom && next.yearTo && next.yearFrom > next.yearTo) {
         next.yearTo = next.yearFrom;
@@ -77,11 +97,17 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }
 
   function clearFilters() {
-    setShareUrl(null);   
-    setFilters({ yearFrom: null, yearTo: null, province: null, status: null, category: null });
+    setShareUrl(null);
+    setFilters({
+      yearFrom: null,
+      yearTo: null,
+      province: null,
+      status: null,
+      category: null,
+    });
   }
 
-  const isFiltered = Object.values(filters).some(v => v != null);
+  const isFiltered = Object.values(filters).some((v) => v != null);
 
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -91,10 +117,14 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     setShareUrl(null);
     try {
       const token = sessionStorage.getItem("token");
-      const API_URL = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:4000";
+      const API_URL =
+        (import.meta as any).env?.VITE_API_URL ?? "http://localhost:4000";
       const res = await fetch(`${API_URL}/api/dashboard-shares`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ filtersJson: JSON.stringify(filters) }),
       });
       if (!res.ok) throw new Error("Failed to create share link");
@@ -108,90 +138,130 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }, [filters]);
 
   const revenueChartTitle = useMemo(() => {
-    if (filters.yearFrom && filters.yearTo) return `Yearly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
+    if (filters.yearFrom && filters.yearTo)
+      return `Yearly Revenue (${filters.yearFrom} – ${filters.yearTo})`;
     if (filters.yearFrom) return `Yearly Revenue (from ${filters.yearFrom})`;
-    if (filters.yearTo)   return `Yearly Revenue (up to ${filters.yearTo})`;
+    if (filters.yearTo) return `Yearly Revenue (up to ${filters.yearTo})`;
     return "Yearly Revenue (All Years)";
   }, [filters.yearFrom, filters.yearTo]);
 
-  const yearlyRevenueChart = useMemo((): ChartDataShape<LineDataset> => ({
-    labels: data?.yearlyRevenue.map(r => r.year) ?? [],
-    datasets: [{
-      label: "Revenue",
-      data:  data?.yearlyRevenue.map(r => r.revenue) ?? [],
-      borderColor:     "#3b82f6",
-      backgroundColor: "rgba(59,130,246,0.15)",
-      fill:       true,
-      tension:    0.4,
-      pointRadius: 4,
-    }],
-  }), [data?.yearlyRevenue]);
+  const yearlyRevenueChart = useMemo(
+    (): ChartDataShape<LineDataset> => ({
+      labels: data?.yearlyRevenue.map((r) => r.year) ?? [],
+      datasets: [
+        {
+          label: "Revenue",
+          data: data?.yearlyRevenue.map((r) => r.revenue) ?? [],
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+        },
+      ],
+    }),
+    [data?.yearlyRevenue],
+  );
 
-  const ordersByStatusChart = useMemo(() => ({
-    labels: data?.ordersByStatus.map(s => s.status) ?? [],
-    datasets: [{
-      data:            data?.ordersByStatus.map(s => s.count) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderWidth:     2,
-      borderColor:     "#1f2937",
-    }],
-  }), [data?.ordersByStatus]);
+  const ordersByStatusChart = useMemo(
+    () => ({
+      labels: data?.ordersByStatus.map((s) => s.status) ?? [],
+      datasets: [
+        {
+          data: data?.ordersByStatus.map((s) => s.count) ?? [],
+          backgroundColor: CHART_COLORS,
+          borderWidth: 2,
+          borderColor: "#1f2937",
+        },
+      ],
+    }),
+    [data?.ordersByStatus],
+  );
 
-  const topProductGroupsChart = useMemo((): ChartDataShape<BarDataset> => ({
-    labels: data?.topProductGroups.map(g => g.name) ?? [],
-    datasets: [{
-      label: "Revenue",
-      data:  data?.topProductGroups.map(g => g.revenue) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  }), [data?.topProductGroups]);
+  const topProductGroupsChart = useMemo(
+    (): ChartDataShape<BarDataset> => ({
+      labels: data?.topProductGroups.map((g) => g.name) ?? [],
+      datasets: [
+        {
+          label: "Revenue",
+          data: data?.topProductGroups.map((g) => g.revenue) ?? [],
+          backgroundColor: CHART_COLORS,
+          borderRadius: 4,
+        },
+      ],
+    }),
+    [data?.topProductGroups],
+  );
 
-  const topProvincesChart = useMemo((): ChartDataShape<BarDataset> => ({
-    labels: data?.topProvinces.map(p => p.province) ?? [],
-    datasets: [{
-      label: "Orders",
-      data:  data?.topProvinces.map(p => p.orders) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderRadius:    4,
-    }],
-  }), [data?.topProvinces]);
+  const topProvincesChart = useMemo(
+    (): ChartDataShape<BarDataset> => ({
+      labels: data?.topProvinces.map((p) => p.province) ?? [],
+      datasets: [
+        {
+          label: "Orders",
+          data: data?.topProvinces.map((p) => p.orders) ?? [],
+          backgroundColor: CHART_COLORS,
+          borderRadius: 4,
+        },
+      ],
+    }),
+    [data?.topProvinces],
+  );
 
   const bubbleTickLabels = useRef<Record<number, string>>({});
 
   const bubbleN = useMemo(() => {
-    const allTop    = data?.topProducts    ?? [];
+    const allTop = data?.topProducts ?? [];
     const allBottom = data?.bottomProducts ?? [];
-    const totalUnique = new Set([...allTop.map(p => p.name), ...allBottom.map(p => p.name)]).size;
+    const totalUnique = new Set([
+      ...allTop.map((p) => p.name),
+      ...allBottom.map((p) => p.name),
+    ]).size;
     return Math.min(5, Math.max(1, Math.floor(totalUnique / 2)));
   }, [data?.topProducts, data?.bottomProducts]);
 
   const productBubbleChart = useMemo(() => {
-    const n           = bubbleN;
-    const allTopProds = data?.topProducts    ?? [];
+    const n = bubbleN;
+    const allTopProds = data?.topProducts ?? [];
     const allBotProds = data?.bottomProducts ?? [];
 
-    const topProds    = allTopProds.slice(0, n);
-    const topNames    = new Set(topProds.map(p => p.name));
-    const bottomProds = allBotProds.filter(p => !topNames.has(p.name)).slice(0, n);
+    const topProds = allTopProds.slice(0, n);
+    const topNames = new Set(topProds.map((p) => p.name));
+    const bottomProds = allBotProds
+      .filter((p) => !topNames.has(p.name))
+      .slice(0, n);
 
     const labels: Record<number, string> = {};
-    topProds.forEach((p, i)    => { labels[i]         = p.name; });
-    bottomProds.forEach((p, i) => { labels[i + n + 1] = p.name; });
+    topProds.forEach((p, i) => {
+      labels[i] = p.name;
+    });
+    bottomProds.forEach((p, i) => {
+      labels[i + n + 1] = p.name;
+    });
     bubbleTickLabels.current = labels;
 
     return {
       datasets: [
         {
           label: `Top ${topProds.length} Products`,
-          data: topProds.map((p, i) => ({ x: i, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
+          data: topProds.map((p, i) => ({
+            x: i,
+            y: Math.max(p.revenue, 1),
+            r: 14,
+            name: p.name,
+          })),
           backgroundColor: "rgba(34, 197, 94, 0.7)",
           borderColor: "rgba(34, 197, 94, 1)",
           borderWidth: 1.5,
         },
         {
           label: `Bottom ${bottomProds.length} Products`,
-          data: bottomProds.map((p, i) => ({ x: i + n + 1, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
+          data: bottomProds.map((p, i) => ({
+            x: i + n + 1,
+            y: Math.max(p.revenue, 1),
+            r: 14,
+            name: p.name,
+          })),
           backgroundColor: "rgba(239, 68, 68, 0.7)",
           borderColor: "rgba(239, 68, 68, 1)",
           borderWidth: 1.5,
@@ -201,7 +271,12 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }, [data?.topProducts, data?.bottomProducts, bubbleN]);
 
   const mapData = useMemo(
-    () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
+    () =>
+      data?.topProvinces.map((p) => ({
+        name: p.province,
+        value: p.revenue,
+        orders: p.orders,
+      })) ?? [],
     [data?.topProvinces],
   );
 
@@ -213,7 +288,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     );
   }
 
-   if (error) {
+  if (error) {
     return (
       <div className="bg-red-900/30 text-red-200 p-4 rounded-lg m-6">
         {error}
@@ -233,7 +308,10 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
         </div>
         <div className="flex items-center gap-3">
           {isFiltered && !viewerMode && (
-            <button onClick={clearFilters} className="text-sm text-blue-400 hover:text-blue-300 underline">
+            <button
+              onClick={clearFilters}
+              className="text-sm text-blue-400 hover:text-blue-300 underline"
+            >
               Clear filters
             </button>
           )}
@@ -254,7 +332,9 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
           <span className="text-gray-400 shrink-0">Share link:</span>
           <code className="text-blue-300 truncate flex-1">{shareUrl}</code>
           <button
-            onClick={() => { navigator.clipboard.writeText(shareUrl); }}
+            onClick={() => {
+              navigator.clipboard.writeText(shareUrl);
+            }}
             className="text-xs text-gray-400 hover:text-white border border-gray-600 rounded px-2 py-1 shrink-0"
           >
             Copy
@@ -262,52 +342,119 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
         </div>
       )}
       {shareUrl === "error" && (
-        <p className="text-red-400 text-sm">Failed to create share link. Please try again.</p>
+        <p className="text-red-400 text-sm">
+          Failed to create share link. Please try again.
+        </p>
       )}
 
       {/* Filter Bar */}
       {viewerMode ? (
         <div className="flex flex-col lg:flex-row lg:items-center gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4 w-full">
-          <span className="font-medium text-gray-500 uppercase tracking-wider mr-1">Filtered by:</span>
-          {filters.yearFrom && <span className="bg-gray-700 px-2 py-1 rounded">Year from {filters.yearFrom}</span>}
-          {filters.yearTo   && <span className="bg-gray-700 px-2 py-1 rounded">Year to {filters.yearTo}</span>}
-          {filters.province && <span className="bg-gray-700 px-2 py-1 rounded">Province: {filters.province}</span>}
-          {filters.status   && <span className="bg-gray-700 px-2 py-1 rounded">Status: {filters.status}</span>}
-          {filters.category && <span className="bg-gray-700 px-2 py-1 rounded">Category: {filters.category}</span>}
-          {!filters.yearFrom && !filters.yearTo && !filters.province && !filters.status && !filters.category && (
-            <span className="italic">No filters — showing all data</span>
+          <span className="font-medium text-gray-500 uppercase tracking-wider mr-1">
+            Filtered by:
+          </span>
+          {filters.yearFrom && (
+            <span className="bg-gray-700 px-2 py-1 rounded">
+              Year from {filters.yearFrom}
+            </span>
           )}
+          {filters.yearTo && (
+            <span className="bg-gray-700 px-2 py-1 rounded">
+              Year to {filters.yearTo}
+            </span>
+          )}
+          {filters.province && (
+            <span className="bg-gray-700 px-2 py-1 rounded">
+              Province: {filters.province}
+            </span>
+          )}
+          {filters.status && (
+            <span className="bg-gray-700 px-2 py-1 rounded">
+              Status: {filters.status}
+            </span>
+          )}
+          {filters.category && (
+            <span className="bg-gray-700 px-2 py-1 rounded">
+              Category: {filters.category}
+            </span>
+          )}
+          {!filters.yearFrom &&
+            !filters.yearTo &&
+            !filters.province &&
+            !filters.status &&
+            !filters.category && (
+              <span className="italic">No filters — showing all data</span>
+            )}
         </div>
       ) : (
         <div className="flex flex-wrap gap-2 sm:gap-3 bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4">
           <div className="flex items-center gap-2 w-full lg:w-auto justify-between sm:justify-start">
             <span className="text-xs text-gray-400">Year</span>
-            <select className={SELECT_CLS} value={filters.yearFrom ?? ""} onChange={e => set("yearFrom", e.target.value)}>
+            <select
+              className={SELECT_CLS}
+              value={filters.yearFrom ?? ""}
+              onChange={(e) => set("yearFrom", e.target.value)}
+            >
               <option value="">From</option>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
             </select>
             <span className="text-gray-500 text-xs">–</span>
-            <select className={SELECT_CLS} value={filters.yearTo ?? ""} onChange={e => set("yearTo", e.target.value)}>
+            <select
+              className={SELECT_CLS}
+              value={filters.yearTo ?? ""}
+              onChange={(e) => set("yearTo", e.target.value)}
+            >
               <option value="">To</option>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full flex-1">
-            <select className={SELECT_CLS} value={filters.province ?? ""} onChange={e => set("province", e.target.value)}>
+            <select
+              className={SELECT_CLS}
+              value={filters.province ?? ""}
+              onChange={(e) => set("province", e.target.value)}
+            >
               <option value="">All provinces</option>
-              {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+              {provinces.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
             </select>
-            <select className={SELECT_CLS} value={filters.status ?? ""} onChange={e => set("status", e.target.value)}>
+            <select
+              className={SELECT_CLS}
+              value={filters.status ?? ""}
+              onChange={(e) => set("status", e.target.value)}
+            >
               <option value="">All statuses</option>
-              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
             </select>
-            <select className={SELECT_CLS} value={filters.category ?? ""} onChange={e => set("category", e.target.value)}>
+            <select
+              className={SELECT_CLS}
+              value={filters.category ?? ""}
+              onChange={(e) => set("category", e.target.value)}
+            >
               <option value="">All categories</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
           </div>
         </div>
-        
       )}
 
       {/* KPI Cards */}
@@ -330,10 +477,19 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       </div>
 
       {/* Province Map */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 w-full overflow-x-auto">
-        <p className="text-sm font-medium text-gray-400 mb-3">Revenue by Province</p>
-        <div className="min-w-[300px] w-full">
-            <CanadaMap data={mapData} legend="Revenue" />
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 w-full">
+        <p className="text-sm font-medium text-gray-400 mb-3">
+          Orders by Province
+        </p>
+
+        <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700">
+          <div className="min-w-[650px] w-full relative">
+            <CanadaMap
+              data={mapData}
+              aggregation="count"
+              legend="Order Count"
+            />
+          </div>
         </div>
       </div>
 
@@ -341,13 +497,32 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col justify-center w-full overflow-hidden">
           <div className="relative w-full h-64 md:h-96">
-            <Line data={yearlyRevenueChart} options={{ ...baseChartOptions(revenueChartTitle, "Year", "Revenue"), maintainAspectRatio: false }} />
+            <Line
+              data={yearlyRevenueChart}
+              options={{
+                ...baseChartOptions(revenueChartTitle, "Year", "Revenue"),
+                maintainAspectRatio: false,
+              }}
+            />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center">
-          <p className="text-sm font-medium text-gray-400 mb-3 self-start">Order Volume by Status</p>
+          <p className="text-sm font-medium text-gray-400 mb-3 self-start">
+            Order Volume by Status
+          </p>
           <div className="relative h-64 md:h-80 w-full flex items-center justify-center">
-            <Pie data={ordersByStatusChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: "#d1d5db", padding: 16 } } } }} />
+            <Pie
+              data={ordersByStatusChart}
+              options={{
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "bottom",
+                    labels: { color: "#d1d5db", padding: 16 },
+                  },
+                },
+              }}
+            />
           </div>
         </div>
       </div>
@@ -356,19 +531,45 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions((data?.topProductGroups.length ?? 0) < 8 ? "Top Product Groups by Revenue" : "Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
+            <Bar
+              data={topProductGroupsChart}
+              options={{
+                ...horizontalBarOptions(
+                  (data?.topProductGroups.length ?? 0) < 8
+                    ? "Top Product Groups by Revenue"
+                    : "Top 8 Product Groups by Revenue",
+                  "Revenue",
+                  "Product Group",
+                ),
+                maintainAspectRatio: false,
+              }}
+            />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions(filters.province ? `Orders — ${filters.province}` : "Top 8 Provinces by Orders", filters.province ? "Number of Orders" : "Order Count", "Province"), maintainAspectRatio: false }} />
+            <Bar
+              data={topProvincesChart}
+              options={{
+                ...horizontalBarOptions(
+                  filters.province
+                    ? `Orders — ${filters.province}`
+                    : "Top 8 Provinces by Orders",
+                  filters.province ? "Number of Orders" : "Order Count",
+                  "Province",
+                ),
+                maintainAspectRatio: false,
+              }}
+            />
           </div>
         </div>
       </div>
 
       {/* Row 3: Top vs Bottom products bubble */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <p className="text-sm font-medium text-gray-400 mb-3">Top {bubbleN} vs Bottom {bubbleN} Products by Revenue</p>
+      <div className="hidden md:block bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-400 mb-3">
+          Top {bubbleN} vs Bottom {bubbleN} Products by Revenue
+        </p>
         <div className="relative h-80 md:h-[26rem]">
           <Bubble
             data={productBubbleChart}
@@ -377,11 +578,18 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
               maintainAspectRatio: false,
               layout: { padding: { top: 10, bottom: 8 } },
               plugins: {
-                legend: { position: "top", labels: { color: "#d1d5db", padding: 16 } },
+                legend: {
+                  position: "top",
+                  labels: { color: "#d1d5db", padding: 16 },
+                },
                 tooltip: {
                   callbacks: {
-                    label: ctx => {
-                      const raw = ctx.raw as { x: number; y: number; name: string };
+                    label: (ctx) => {
+                      const raw = ctx.raw as {
+                        x: number;
+                        y: number;
+                        name: string;
+                      };
                       return `${raw.name}: ${fmtRev(raw.y)}`;
                     },
                   },
@@ -407,7 +615,11 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
                 },
                 y: {
                   type: "logarithmic",
-                  title: { display: true, text: "Revenue (CAD) — log scale", color: "#9ca3af" },
+                  title: {
+                    display: true,
+                    text: "Revenue (CAD) — log scale",
+                    color: "#9ca3af",
+                  },
                   ticks: {
                     color: "#9ca3af",
                     callback: (v) => fmtRev(Number(v)),
@@ -418,9 +630,11 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
             }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">Green = top {bubbleN} performers · Red = bottom {bubbleN} · Gap separates the two groups · Log scale makes both visible</p>
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          Green = top {bubbleN} performers · Red = bottom {bubbleN} · Gap
+          separates the two groups · Log scale makes both visible
+        </p>
       </div>
-
     </div>
   );
 }
