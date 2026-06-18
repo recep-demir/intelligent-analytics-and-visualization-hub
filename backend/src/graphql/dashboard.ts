@@ -294,7 +294,7 @@ async function fetchOrdersByStatus(
 async function fetchTopProductGroups(
   args: DashboardStatsArgs,
 ): Promise<{ name: string; revenue: number }[]> {
-  const conditions = buildItemConditions(args, { applyStatusDefault: true });
+  const conditions = buildItemConditions(args, { applyStatusDefault: false });
   const replacements = buildReplacements(args);
   const orderJoins = buildItemOrderJoins(args, true);
 
