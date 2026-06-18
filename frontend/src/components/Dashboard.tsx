@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Bar, Line, Pie, Doughnut } from "react-chartjs-2";
+import { Bar, Line, Pie, Bubble } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
@@ -124,15 +124,41 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
     }],
   }), [data?.topProvinces]);
 
-  const bottomProductsChart = useMemo(() => ({
-    labels: data?.bottomProducts.map(p => p.name) ?? [],
-    datasets: [{
-      data:            data?.bottomProducts.map(p => p.revenue) ?? [],
-      backgroundColor: CHART_COLORS,
-      borderWidth:     2,
-      borderColor:     "#1f2937",
-    }],
-  }), [data?.bottomProducts]);
+  const productBubbleChart = useMemo(() => {
+    const allRevenues = [
+      ...(data?.topProducts.map(p => p.revenue) ?? []),
+      ...(data?.bottomProducts.map(p => p.revenue) ?? []),
+    ];
+    const maxRev = allRevenues.length ? Math.max(...allRevenues) : 1;
+    const toRadius = (rev: number) => Math.max(6, Math.round((rev / maxRev) * 30));
+
+    return {
+      datasets: [
+        {
+          label: "Top 5 Products",
+          data: (data?.topProducts ?? []).map((p, i) => ({
+            x: i + 1,
+            y: p.revenue,
+            r: toRadius(p.revenue),
+            name: p.name,
+          })),
+          backgroundColor: "rgba(34, 197, 94, 0.7)",
+          borderColor: "rgba(34, 197, 94, 1)",
+        },
+        {
+          label: "Bottom 5 Products",
+          data: (data?.bottomProducts ?? []).map((p, i) => ({
+            x: i + 1,
+            y: p.revenue,
+            r: toRadius(p.revenue),
+            name: p.name,
+          })),
+          backgroundColor: "rgba(239, 68, 68, 0.7)",
+          borderColor: "rgba(239, 68, 68, 1)",
+        },
+      ],
+    };
+  }, [data?.topProducts, data?.bottomProducts]);
 
   const mapData = useMemo(
     () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
@@ -295,12 +321,41 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
         </div>
       </div>
 
-      {/* Row 3: Bottom products */}
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col items-center">
-        <p className="text-sm font-medium text-gray-400 mb-3 self-start">Top 5 Lowest-Performing Products by Revenue</p>
-        <div className="relative h-64 md:h-80 w-full max-w-md">
-          <Doughnut data={bottomProductsChart} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: "#d1d5db", padding: 16 } } } }} />
+      {/* Row 3: Top vs Bottom products bubble */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-400 mb-3">Top 5 vs Bottom 5 Products by Revenue</p>
+        <div className="relative h-72 md:h-96">
+          <Bubble
+            data={productBubbleChart}
+            options={{
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: "top", labels: { color: "#d1d5db", padding: 16 } },
+                tooltip: {
+                  callbacks: {
+                    label: ctx => {
+                      const raw = ctx.raw as { x: number; y: number; r: number; name: string };
+                      return `${raw.name}: $${raw.y.toLocaleString()}`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  title: { display: true, text: "Rank (1 = best or worst)", color: "#9ca3af" },
+                  ticks: { color: "#9ca3af", stepSize: 1 },
+                  grid: { color: "#374151" },
+                },
+                y: {
+                  title: { display: true, text: "Revenue (CAD)", color: "#9ca3af" },
+                  ticks: { color: "#9ca3af", callback: (v) => `$${Number(v).toLocaleString()}` },
+                  grid: { color: "#374151" },
+                },
+              },
+            }}
+          />
         </div>
+        <p className="text-xs text-gray-500 mt-2 text-center">Bubble size = relative revenue · Green = top performers · Red = lowest performers</p>
       </div>
 
     </div>

@@ -11,6 +11,7 @@ export interface DashboardStats {
   ordersByStatus:   StatusCount[];
   topProductGroups: GroupRevenue[];
   topProvinces:     ProvinceCount[];
+  topProducts:      ProductRevenue[];
   bottomProducts:   ProductRevenue[];
 }
 

@@ -9,6 +9,7 @@ import {
   LineElement,
   PointElement,
   ArcElement,
+  BubbleController,
   Title,
   Tooltip,
   Legend,
@@ -21,7 +22,7 @@ import App from './App.tsx'
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Title, Tooltip, Legend, Filler,
+  PointElement, ArcElement, BubbleController, Title, Tooltip, Legend, Filler,
   TreemapController, TreemapElement,
   MatrixController, MatrixElement,
 )
