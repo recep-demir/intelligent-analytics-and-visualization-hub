@@ -336,14 +336,20 @@ async function fetchTopProvinces(
 ): Promise<{ province: string; orders: number }[]> {
   const { where, replacements } = buildOrderLevelWhere(args);
 
+  const canadaCondition = "LOWER(a.country) = 'ca'";
+  const provinceWhere = where
+    ? `${where}\n      AND ${canadaCondition}`
+    : `WHERE ${canadaCondition}`;
+
   const [rows] = await sequelize.query(
     `
     SELECT a.province, COUNT(o.id) as orders
     FROM Orders o
     JOIN Addresses a ON o.addressId = a.id
-    ${where}
+    ${provinceWhere}
     GROUP BY a.province
     ORDER BY orders DESC
+    LIMIT 8
   `,
     { replacements },
   );
