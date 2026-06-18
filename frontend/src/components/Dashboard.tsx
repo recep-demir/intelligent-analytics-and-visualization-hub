@@ -41,7 +41,7 @@ const bubbleLabelPlugin = {
         ctx.textAlign = "center";
         ctx.font = "8px sans-serif";
         ctx.fillStyle = "#9ca3af";
-        ctx.fillText(fmtRev(raw.y), x, y + r + 10);
+        ctx.fillText(fmtRev(raw.y ?? 0), x, y + r + 10);
       });
     });
     ctx.restore();
@@ -87,23 +87,16 @@ export function Dashboard({
     setShareUrl(null);
 
     setFilters((prev) => {
-      // 1. Handle parsing the raw string into the correct type based on the key
       const isYear = key === "yearFrom" || key === "yearTo";
-      let parsedValue: string | number | null = raw;
+      const value = raw === "" ? null : isYear ? Number(raw) : raw;
 
-      if (raw === "") {
-        parsedValue = null;
-      } else if (isYear) {
-        parsedValue = Number(raw);
-      }
+      // Cast cleanly to stop TypeScript from worrying about dynamic key matching
+      const next = { ...prev, [key]: value } as unknown as DashboardFilters;
 
-      // 2. Create the new state object safely
-      const next: DashboardFilters = { ...prev, [key]: parsedValue };
-
-      // 3. Keep your year validation logic safe and sound
+      // Using 'typeof' guarantees the values exist and are strictly numbers
       if (
-        next.yearFrom !== null &&
-        next.yearTo !== null &&
+        typeof next.yearFrom === "number" &&
+        typeof next.yearTo === "number" &&
         next.yearFrom > next.yearTo
       ) {
         next.yearTo = next.yearFrom;
