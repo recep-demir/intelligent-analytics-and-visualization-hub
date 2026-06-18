@@ -5,24 +5,25 @@ const CANADA_GEO = "/canada-provinces.json";
 
 const PROVINCE_LABELS: {
   province: string;
+  capital: string;
   coords: [number, number];
   anchor: "middle" | "start" | "end";
   dx: number;
   dy: number;
 }[] = [
-  { province: "British Columbia",          coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
-  { province: "Alberta",                   coords: [-113.49, 53.54], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Saskatchewan",              coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Manitoba",                  coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Ontario",                   coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Quebec",                    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
-  { province: "New Brunswick",             coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
-  { province: "Nova Scotia",               coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
-  { province: "Prince Edward Island",      coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
-  { province: "Newfoundland and Labrador", coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Yukon",                     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
-  { province: "Northwest Territories",     coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
-  { province: "Nunavut",                   coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "British Columbia",          capital: "Victoria",       coords: [-123.37, 48.43], anchor: "end",    dx:  -3, dy: -4 },
+  { province: "Alberta",                   capital: "Edmonton",       coords: [-113.49, 53.55], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Saskatchewan",              capital: "Regina",         coords: [-104.62, 50.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Manitoba",                  capital: "Winnipeg",       coords: [ -97.14, 49.90], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Ontario",                   capital: "Toronto",        coords: [ -79.38, 43.65], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Quebec",                    capital: "Quebec City",    coords: [ -71.21, 46.81], anchor: "end",    dx:  -4, dy: -3 },
+  { province: "New Brunswick",             capital: "Fredericton",    coords: [ -66.64, 45.96], anchor: "start",  dx:   4, dy:  6 },
+  { province: "Nova Scotia",               capital: "Halifax",        coords: [ -63.58, 44.65], anchor: "start",  dx:   4, dy:  7 },
+  { province: "Prince Edward Island",      capital: "Charlottetown",  coords: [ -63.13, 46.24], anchor: "end",    dx:  -4, dy:  6 },
+  { province: "Newfoundland and Labrador", capital: "St. John's",     coords: [ -52.71, 47.56], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Yukon",                     capital: "Whitehorse",     coords: [-135.06, 60.72], anchor: "start",  dx:   3, dy: -4 },
+  { province: "Northwest Territories",     capital: "Yellowknife",    coords: [-114.37, 62.45], anchor: "middle", dx:   0, dy: -4 },
+  { province: "Nunavut",                   capital: "Iqaluit",        coords: [ -68.52, 63.75], anchor: "end",    dx:  -3, dy: -4 },
 ];
 
 function normalizeProvince(s: string): string {
@@ -138,7 +139,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                   })
                 }
               </Geographies>
-              {PROVINCE_LABELS.map(({ province, coords, anchor, dx, dy }) => (
+              {PROVINCE_LABELS.map(({ province, capital, coords, anchor, dx, dy }) => (
                 <Marker key={province} coordinates={coords}>
                   <circle
                     r={2.5}
@@ -152,7 +153,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                       const val = lookup[normProv] ?? 0;
                       const rev = ordersLookup[normProv];
                       const revStr = rev !== undefined ? `  ·  ${formatVal(rev, "count")} orders` : "";
-                      setTooltip(`${province}${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${revStr}`);
+                      setTooltip(`${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${revStr}`);
                     }}
                     onMouseLeave={() => setTooltip(null)}
                   />
@@ -162,7 +163,7 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     y={dy}
                     style={{ fontSize: "7px", fill: "#d1d5db", fontFamily: "sans-serif", pointerEvents: "none" }}
                   >
-                    {province}
+                    {capital}
                   </text>
                 </Marker>
               ))}
