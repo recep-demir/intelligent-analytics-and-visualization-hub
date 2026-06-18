@@ -1,36 +1,35 @@
-import { ChartConfig } from './chart'
-
+import type { ChartConfig } from "./chart";
 export interface ShareLink {
-  id:          number
-  uuid:        string
-  queryConfig: ChartConfig
-  createdBy:   number   // user id
-  createdAt:   number
+  id: number;
+  uuid: string;
+  queryConfig: ChartConfig;
+  createdBy: number; // user id
+  createdAt: number;
 }
 
 export interface CreateShareRequest {
-  queryConfig: ChartConfig
+  queryConfig: ChartConfig;
 }
 
 export interface CreateShareResponse {
-  uuid: string
-  url:  string
+  uuid: string;
+  url: string;
 }
 // ── APPEND AFTER LINE 19 ──────────────────────────────────────────
 
 export interface DashboardSharePayload {
-  filtersJson: string
-  title?:      string
+  filtersJson: string;
+  title?: string;
 }
 
 export interface DashboardShareCreateResponse {
-  shareId: string
+  shareId: string;
 }
 
 export interface DashboardShareGetResponse {
-  shareId:     string
-  filtersJson: string
-  title:       string | null
-  role:        'admin' | 'analyst' | 'viewer'
-  interactive: boolean
+  shareId: string;
+  filtersJson: string;
+  title: string | null;
+  role: "admin" | "analyst" | "viewer";
+  interactive: boolean;
 }
