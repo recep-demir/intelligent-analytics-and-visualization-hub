@@ -159,34 +159,46 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
 
   const bubbleTickLabels = useRef<Record<number, string>>({});
 
+  const bubbleN = useMemo(() => {
+    const allTop    = data?.topProducts    ?? [];
+    const allBottom = data?.bottomProducts ?? [];
+    const totalUnique = new Set([...allTop.map(p => p.name), ...allBottom.map(p => p.name)]).size;
+    return Math.min(5, Math.max(1, Math.floor(totalUnique / 2)));
+  }, [data?.topProducts, data?.bottomProducts]);
+
   const productBubbleChart = useMemo(() => {
-    const topProds    = data?.topProducts    ?? [];
-    const bottomProds = data?.bottomProducts ?? [];
+    const n           = bubbleN;
+    const allTopProds = data?.topProducts    ?? [];
+    const allBotProds = data?.bottomProducts ?? [];
+
+    const topProds    = allTopProds.slice(0, n);
+    const topNames    = new Set(topProds.map(p => p.name));
+    const bottomProds = allBotProds.filter(p => !topNames.has(p.name)).slice(0, n);
 
     const labels: Record<number, string> = {};
-    topProds.forEach((p, i)    => { labels[i]     = p.name; });
-    bottomProds.forEach((p, i) => { labels[i + 6] = p.name; });
+    topProds.forEach((p, i)    => { labels[i]         = p.name; });
+    bottomProds.forEach((p, i) => { labels[i + n + 1] = p.name; });
     bubbleTickLabels.current = labels;
 
     return {
       datasets: [
         {
-          label: "Top 5 Products",
+          label: `Top ${topProds.length} Products`,
           data: topProds.map((p, i) => ({ x: i, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
           backgroundColor: "rgba(34, 197, 94, 0.7)",
           borderColor: "rgba(34, 197, 94, 1)",
           borderWidth: 1.5,
         },
         {
-          label: "Bottom 5 Products",
-          data: bottomProds.map((p, i) => ({ x: i + 6, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
+          label: `Bottom ${bottomProds.length} Products`,
+          data: bottomProds.map((p, i) => ({ x: i + n + 1, y: Math.max(p.revenue, 1), r: 14, name: p.name })),
           backgroundColor: "rgba(239, 68, 68, 0.7)",
           borderColor: "rgba(239, 68, 68, 1)",
           borderWidth: 1.5,
         },
       ],
     };
-  }, [data?.topProducts, data?.bottomProducts]);
+  }, [data?.topProducts, data?.bottomProducts, bubbleN]);
 
   const mapData = useMemo(
     () => data?.topProvinces.map(p => ({ name: p.province, value: p.revenue, orders: p.orders })) ?? [],
@@ -339,7 +351,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions("Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
+            <Bar data={topProductGroupsChart} options={{ ...horizontalBarOptions((data?.topProductGroups.length ?? 0) < 8 ? "Top Product Groups by Revenue" : "Top 8 Product Groups by Revenue", "Revenue", "Product Group"), maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
@@ -351,7 +363,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
 
       {/* Row 3: Top vs Bottom products bubble */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-        <p className="text-sm font-medium text-gray-400 mb-3">Top 5 vs Bottom 5 Products by Revenue</p>
+        <p className="text-sm font-medium text-gray-400 mb-3">Top {bubbleN} vs Bottom {bubbleN} Products by Revenue</p>
         <div className="relative h-80 md:h-[26rem]">
           <Bubble
             data={productBubbleChart}
@@ -373,7 +385,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
               scales: {
                 x: {
                   min: -0.8,
-                  max: 10.8,
+                  max: bubbleN * 2 + 0.8,
                   ticks: {
                     color: "#9ca3af",
                     stepSize: 1,
@@ -401,7 +413,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
             }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">Green = top 5 performers · Red = bottom 5 · Gap separates the two groups · Log scale makes both visible</p>
+        <p className="text-xs text-gray-500 mt-2 text-center">Green = top {bubbleN} performers · Red = bottom {bubbleN} · Gap separates the two groups · Log scale makes both visible</p>
       </div>
 
     </div>
