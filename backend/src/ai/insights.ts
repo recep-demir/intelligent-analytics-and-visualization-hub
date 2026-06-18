@@ -23,17 +23,37 @@ function pct(part: number, total: number): string {
   return `${Math.round((part / total) * 100)}%`;
 }
 
+function metricLabel(q: ResolvedQuery): string {
+  if (q.aggregation === "count") return "order count"
+  if (q.metric === "tax")   return "tax"
+  if (q.metric === "total") return "grand total"
+  if (q.metric === "both")  return "revenue & tax"
+  return "revenue"
+}
+
 // ---------------------------------------------------------------------------
 // Rule-based generators — instant, no API cost
 // ---------------------------------------------------------------------------
 function statInsights(data: DataRow[], q: ResolvedQuery): string[] {
+  // Dual-metric stat: two named rows from buildBothMetricsQuery
+  if (q.metric === 'both') {
+    const rev = Number(data.find(r => r.name === 'Revenue')?.value ?? 0)
+    const tax = Number(data.find(r => r.name === 'Tax Collected')?.value ?? 0)
+    const ratio = rev > 0 ? (tax / rev * 100).toFixed(1) : '0'
+    return [
+      `Revenue: ${fmt(rev, 'sum')} — Tax collected: ${fmt(tax, 'sum')}`,
+      `Tax is ${ratio}% of pre-tax revenue`,
+    ]
+  }
+
   const val = Number(data[0]?.value ?? 0);
+  const ml = metricLabel(q)
   switch (q.aggregation) {
     case "count": return [`Total order count: ${fmt(val, "count")}`];
-    case "avg":   return [`Average order value: ${fmt(val, "avg")}`];
-    case "min":   return [`Minimum order value: ${fmt(val, "min")}`];
-    case "max":   return [`Maximum order value: ${fmt(val, "max")}`];
-    default:      return [`Total value: ${fmt(val, q.aggregation)}`];
+    case "avg":   return [`Average ${ml}: ${fmt(val, "avg")}`];
+    case "min":   return [`Minimum ${ml}: ${fmt(val, "min")}`];
+    case "max":   return [`Maximum ${ml}: ${fmt(val, "max")}`];
+    default:      return [`Total ${ml}: ${fmt(val, q.aggregation)}`];
   }
 }
 
@@ -51,7 +71,7 @@ function barInsights(data: DataRow[], q: ResolvedQuery, question: string): strin
   const out: string[] = [];
 
   if (isBottom) {
-    const label = agg === "count" ? "order count" : "revenue";
+    const label = metricLabel(q);
     out.push(`${rows[0].name} has the weakest ${label} at ${fmt(Number(rows[0].value), agg)}`);
     if (rows.length >= 2) {
       const base = Number(rows[0].value);
@@ -86,7 +106,7 @@ function barInsights(data: DataRow[], q: ResolvedQuery, question: string): strin
             ? ` — ${pctAhead}% higher than ${rows[1].name} (${fmt(second, agg)})`
             : ` — nearly tied with ${rows[1].name} at ${fmt(second, agg)}`;
         })()
-      : ` — ${rows[1].name} has no recorded ${agg === "count" ? "orders" : "revenue"}`;
+      : ` — ${rows[1].name} has no recorded ${metricLabel(q)}`;
     out.push(`${rows[0].name} leads at ${fmt(top, agg)}${comparison}`);
   } else if (rows.length === 1) {
     out.push(`${rows[0].name}: ${fmt(Number(rows[0].value), agg)}`);
@@ -150,6 +170,50 @@ function minmaxInsights(data: DataRow[]): string[] {
     `Lowest min: ${lowMin.name} at ${fmt(Number(lowMin.min), "sum")}`,
     `Average monthly spread between min and max: ${fmt(avgSpread, "sum")}`,
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Multi-series line insights — top-N products/categories shown as separate lines.
+// Data shape: { series, name, value } — one row per (series × period).
+// Groups by series, computes period totals, compares leaders.
+// ---------------------------------------------------------------------------
+function multiSeriesLineInsights(data: DataRow[], q: ResolvedQuery): string[] {
+  const seriesTotals = new Map<string, number>()
+  for (const row of data) {
+    const s = String((row as any).series)
+    seriesTotals.set(s, (seriesTotals.get(s) ?? 0) + Number(row.value))
+  }
+  const sorted = [...seriesTotals.entries()].sort((a, b) => b[1] - a[1])
+  if (sorted.length === 0) return []
+
+  const agg = q.aggregation
+  const out: string[] = []
+
+  if (sorted.length >= 2) {
+    const [top, topVal] = sorted[0]
+    const [second, secondVal] = sorted[1]
+    const pctAhead = secondVal > 0 ? Math.round((topVal / secondVal - 1) * 100) : null
+    out.push(pctAhead !== null
+      ? `${top} leads over the period at ${fmt(topVal, agg)} — ${pctAhead}% ahead of ${second} (${fmt(secondVal, agg)})`
+      : `${top} leads at ${fmt(topVal, agg)}`
+    )
+  } else {
+    out.push(`${sorted[0][0]}: ${fmt(sorted[0][1], q.aggregation)}`)
+  }
+
+  if (sorted.length >= 3) {
+    const [bot, botVal] = sorted[sorted.length - 1]
+    out.push(`${bot} has the lowest total at ${fmt(botVal, agg)}`)
+  }
+
+  // 3rd bullet: leader's concentration share of combined total
+  if (sorted.length >= 3) {
+    const grandTotal = sorted.reduce((s, [, v]) => s + v, 0)
+    const topShare   = grandTotal > 0 ? Math.round((sorted[0][1] / grandTotal) * 100) : 0
+    out.push(`${sorted[0][0]} accounts for ${topShare}% of the combined total (${fmt(grandTotal, agg)})`)
+  }
+
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +296,7 @@ async function geminiInsights(
   const result = await Promise.race([
     model.generateContent(prompt),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Insights timeout")), 2000)
+      setTimeout(() => reject(new Error("Insights timeout")), 3500)
     ),
   ]);
 
@@ -269,8 +333,31 @@ export async function generateInsights(
 
       case "bar":
       case "map":
-      case "treemap":
+      case "treemap": {
+        if (resolved.metric === 'both') {
+          const revRows    = data.filter(r => (r as any).series === 'Revenue')
+          const taxRows    = data.filter(r => (r as any).series === 'Tax Collected')
+          const totalRev   = revRows.reduce((s, r) => s + Number(r.value), 0)
+          const totalTax   = taxRows.reduce((s, r) => s + Number(r.value), 0)
+          const ratio      = totalRev > 0 ? (totalTax / totalRev * 100).toFixed(1) : '0'
+          const sortedRev  = [...revRows].sort((a, b) => Number(b.value) - Number(a.value))
+          const topRev     = sortedRev[0]
+          const lowestRev  = sortedRev[sortedRev.length - 1]
+          const out = [`Tax collected is ${ratio}% of pre-tax revenue — ${fmt(totalTax, 'sum')} on ${fmt(totalRev, 'sum')}`]
+          if (topRev) {
+            const topTax = taxRows.find(r => r.name === topRev.name)
+            const taxVal = topTax ? Number(topTax.value) : Number(topRev.value) * 0.15
+            out.push(`${topRev.name} leads with ${fmt(Number(topRev.value), 'sum')} revenue and ${fmt(taxVal, 'sum')} tax`)
+          }
+          if (lowestRev && topRev && lowestRev.name !== topRev.name) {
+            const lowestTax = taxRows.find(r => r.name === lowestRev.name)
+            const lowestTaxVal = lowestTax ? Number(lowestTax.value) : 0
+            out.push(`Lowest: ${lowestRev.name} at ${fmt(Number(lowestRev.value), 'sum')} revenue and ${fmt(lowestTaxVal, 'sum')} tax`)
+          }
+          return out
+        }
         return barInsights(data, resolved, question);
+      }
 
       case "pie":
       case "donut":
@@ -284,6 +371,34 @@ export async function generateInsights(
         return heatmapInsights(data, resolved);
 
       case "line": {
+        // Dual-metric: separate Revenue and Tax Collected series from UNION query
+        if (resolved.metric === 'both') {
+          const revRows   = data.filter(r => (r as any).series === 'Revenue')
+          const taxRows   = data.filter(r => (r as any).series === 'Tax Collected')
+          const totalRev  = revRows.reduce((s, r) => s + Number(r.value), 0)
+          const totalTax  = taxRows.reduce((s, r) => s + Number(r.value), 0)
+          const peakRev   = [...revRows].sort((a, b) => Number(b.value) - Number(a.value))[0]
+          const troughRev = [...revRows].sort((a, b) => Number(a.value) - Number(b.value))[0]
+          const out: string[] = []
+          if (peakRev && troughRev && peakRev.name !== troughRev.name) {
+            const swing = Number(peakRev.value) - Number(troughRev.value)
+            out.push(`Revenue peaks in ${peakRev.name} at ${fmt(Number(peakRev.value), 'sum')}, lowest in ${troughRev.name} at ${fmt(Number(troughRev.value), 'sum')} — ${fmt(swing, 'sum')} swing`)
+          } else if (peakRev) {
+            out.push(`Revenue peaks in ${peakRev.name} at ${fmt(Number(peakRev.value), 'sum')}`)
+          }
+          if (totalRev > 0) {
+            out.push(`Period totals: ${fmt(totalRev, 'sum')} revenue — ${fmt(totalTax, 'sum')} tax collected`)
+          }
+          return out
+        }
+
+        // Multi-series top-N: { series, name, value } — group by series for total comparison
+        const isMultiSeries = data.length > 0 && 'series' in data[0]
+        if (isMultiSeries) {
+          return multiSeriesLineInsights(data, resolved)
+        }
+
+        // Single-metric time-series: use Gemini for trend detection, barInsights as fallback
         const lineFallback = resolved.aggregation === "minmax"
           ? minmaxInsights(data)
           : barInsights(data, resolved, question);
