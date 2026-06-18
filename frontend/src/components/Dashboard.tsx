@@ -125,7 +125,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }), [data?.topProvinces]);
 
   const mapData = useMemo(
-    () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders })) ?? [],
+    () => data?.topProvinces.map(p => ({ name: p.province, value: p.orders, revenue: p.revenue })) ?? [],
     [data?.topProvinces],
   );
 

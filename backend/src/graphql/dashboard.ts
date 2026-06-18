@@ -22,7 +22,7 @@ export const dashboardTypeDefs = `#graphql
   type MonthlyRevenue  { month: String!    revenue: Float! }
   type StatusCount     { status: String!   count: Int!     }
   type GroupRevenue    { name: String!     revenue: Float! }
-  type ProvinceCount   { province: String! orders: Int!    }
+  type ProvinceCount   { province: String! orders: Int! revenue: Float! }
   type CategoryRevenue  { category: String! revenue: Float! }
   type ProductRevenue   { name: String!     revenue: Float! }
 
@@ -333,7 +333,7 @@ async function fetchTopProductGroups(
 
 async function fetchTopProvinces(
   args: DashboardStatsArgs,
-): Promise<{ province: string; orders: number }[]> {
+): Promise<{ province: string; orders: number; revenue: number }[]> {
   const { where, replacements } = buildOrderLevelWhere(args);
 
   const canadaCondition = "LOWER(a.country) = 'ca'";
@@ -343,7 +343,7 @@ async function fetchTopProvinces(
 
   const [rows] = await sequelize.query(
     `
-    SELECT a.province, COUNT(o.id) as orders
+    SELECT a.province, COUNT(o.id) as orders, ROUND(SUM(o.subtotal), 2) as revenue
     FROM Orders o
     JOIN Addresses a ON o.addressId = a.id
     ${provinceWhere}
@@ -354,7 +354,7 @@ async function fetchTopProvinces(
     { replacements },
   );
 
-  return rows as { province: string; orders: number }[];
+  return rows as { province: string; orders: number; revenue: number }[];
 }
 
 async function fetchCategoryRevenue(

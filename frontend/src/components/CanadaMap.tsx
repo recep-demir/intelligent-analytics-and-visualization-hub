@@ -63,7 +63,7 @@ function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number
 }
 
 interface Props {
-  data: { name: string; value: number }[];
+  data: { name: string; value: number; revenue?: number }[];
   aggregation?: string;
   legend?: string;
 }
@@ -72,8 +72,10 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const [tooltip, setTooltip] = useState<string | null>(null);
 
   const lookup: Record<string, number> = {};
+  const revenueLookup: Record<string, number> = {};
   data.forEach(d => {
     lookup[normalizeProvince(d.name)] = d.value;
+    if (d.revenue !== undefined) revenueLookup[normalizeProvince(d.name)] = d.revenue;
   });
 
   const vals  = Object.values(lookup);
@@ -120,7 +122,11 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                         fillOpacity={val ? 0.9 : 0.4}
                         stroke="#374151"
                         strokeWidth={0.4}
-                        onMouseEnter={() => setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}`)}
+                        onMouseEnter={() => {
+                          const rev = revenueLookup[name];
+                          const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
+                          setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${revStr}`);
+                        }}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
                           default: { outline: "none" },
@@ -141,7 +147,13 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     stroke="#0d1117"
                     strokeWidth={0.6}
                     style={{ cursor: "pointer" }}
-                    onMouseEnter={() => setTooltip(province)}
+                    onMouseEnter={() => {
+                      const normProv = normalizeProvince(province);
+                      const val = lookup[normProv] ?? 0;
+                      const rev = revenueLookup[normProv];
+                      const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
+                      setTooltip(`${province}${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${revStr}`);
+                    }}
                     onMouseLeave={() => setTooltip(null)}
                   />
                   <text
@@ -183,7 +195,11 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                           fillOpacity={val ? 0.9 : 0.35}
                           stroke="#374151"
                           strokeWidth={0.8}
-                          onMouseEnter={() => setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}`)}
+                          onMouseEnter={() => {
+                            const rev = revenueLookup[name];
+                            const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
+                            setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${revStr}`);
+                          }}
                           onMouseLeave={() => setTooltip(null)}
                           style={{
                             default: { outline: "none" },

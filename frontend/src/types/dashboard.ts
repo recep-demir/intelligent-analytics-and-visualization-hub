@@ -2,7 +2,7 @@ export interface YearlyRevenue   { year: string;     revenue: number }
 export interface MonthlyRevenue  { month: string;    revenue: number }
 export interface StatusCount     { status: string;   count: number  }
 export interface GroupRevenue    { name: string;     revenue: number }
-export interface ProvinceCount   { province: string; orders: number  }
+export interface ProvinceCount   { province: string; orders: number; revenue: number }
 export interface DashboardStats {
   taxSummary:       TaxSummary;
   yearlyRevenue:    YearlyRevenue[];

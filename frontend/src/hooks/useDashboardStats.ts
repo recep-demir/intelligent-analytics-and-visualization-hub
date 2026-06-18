@@ -35,7 +35,7 @@ function buildQuery(filters: DashboardFilters): string {
         yearlyRevenue    { year revenue }
         ordersByStatus   { status count }
         topProductGroups { name revenue }
-        topProvinces     { province orders }
+        topProvinces     { province orders revenue }
       }
     }
   `;
