@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 
 const CANADA_GEO = "/canada-provinces.json";
@@ -93,11 +93,11 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const MARITIMES = ["New Brunswick", "Nova Scotia", "Prince Edward Island", "Newfoundland and Labrador", "Newfoundland"];
   const hasMaritimeData = MARITIMES.some(p => (lookup[normalizeProvince(p)] ?? 0) > 0);
 
-  function buildTooltip(rawName: string, name: string, val: number): string {
+  const buildTooltip = useCallback((rawName: string, name: string, val: number): string => {
     const orders = ordersLookup[name];
     const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
     return `${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${ordersStr}`;
-  }
+  }, [ordersLookup, aggregation]);
 
   return (
     <div className="w-full">
