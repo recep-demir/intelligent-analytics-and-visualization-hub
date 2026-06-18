@@ -48,6 +48,11 @@ function formatVal(v: number, aggregation?: string): string {
   return `$${Number(v).toFixed(2)}`;
 }
 
+function getTooltipPos(e: MouseEvent, target: SVGElement): { x: number; y: number } {
+  const rect = target.closest(".rounded-xl")!.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
 function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number; agg?: string; label: string }) {
   return (
     <div className="flex flex-col items-center justify-between py-2 w-20 shrink-0">
@@ -144,8 +149,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                         stroke="#374151"
                         strokeWidth={0.4}
                         onMouseEnter={e => {
-                          const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
-                          setTooltip({ text: buildTooltip(rawName, name, val), x: e.clientX - rect.left, y: e.clientY - rect.top });
+                          const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                          setTooltip({ text: buildTooltip(rawName, name, val), ...pos });
                         }}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
@@ -172,8 +177,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                       const val = lookup[normProv] ?? 0;
                       const orders = ordersLookup[normProv];
                       const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
-                      const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
-                      setTooltip({ text: `${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${ordersStr}`, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                      const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                      setTooltip({ text: `${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${ordersStr}`, ...pos });
                     }}
                     onMouseLeave={() => setTooltip(null)}
                   />
@@ -217,8 +222,8 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                           stroke="#374151"
                           strokeWidth={0.8}
                           onMouseEnter={e => {
-                            const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
-                            setTooltip({ text: buildTooltip(rawName, name, val), x: e.clientX - rect.left, y: e.clientY - rect.top });
+                            const pos = getTooltipPos(e as unknown as MouseEvent, e.currentTarget as SVGElement);
+                            setTooltip({ text: buildTooltip(rawName, name, val), ...pos });
                           }}
                           onMouseLeave={() => setTooltip(null)}
                           style={{
