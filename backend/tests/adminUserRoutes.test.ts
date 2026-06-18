@@ -200,4 +200,80 @@ describe("admin user routes", () => {
       message: "Admin cannot change their own role",
     });
   });
+
+it("allows admin to delete another non-admin user", async () => {
+  const token = createToken("admin", 999);
+
+  const user = await User.create({
+    email: "viewer.user@example.com",
+    passwordHash: "hashed-password",
+    role: "viewer",
+  });
+
+  const response = await request(app)
+    .delete(`/api/admin/users/${user.id}`)
+    .set("Authorization", `Bearer ${token}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body).toEqual({
+    message: "User deleted successfully",
+  });
+
+  const deletedUser = await User.findByPk(user.id);
+  expect(deletedUser).toBeNull();
+});
+
+it("prevents admin from deleting their own account", async () => {
+  const user = await User.create({
+    email: "admin.user@example.com",
+    passwordHash: "hashed-password",
+    role: "admin",
+  });
+
+  const token = createToken("admin", user.id);
+
+  const response = await request(app)
+    .delete(`/api/admin/users/${user.id}`)
+    .set("Authorization", `Bearer ${token}`);
+
+  expect(response.status).toBe(400);
+  expect(response.body).toMatchObject({
+    error: "Bad Request",
+    message: "Admin cannot delete their own account",
+  });
+});
+
+it("prevents deleting admin accounts", async () => {
+  const token = createToken("admin", 999);
+
+  const user = await User.create({
+    email: "other.admin@example.com",
+    passwordHash: "hashed-password",
+    role: "admin",
+  });
+
+  const response = await request(app)
+    .delete(`/api/admin/users/${user.id}`)
+    .set("Authorization", `Bearer ${token}`);
+
+  expect(response.status).toBe(403);
+  expect(response.body).toMatchObject({
+    error: "Forbidden",
+    message: "Admin accounts cannot be deleted",
+  });
+});
+
+it("returns 404 when deleting a missing user", async () => {
+  const token = createToken("admin", 999);
+
+  const response = await request(app)
+    .delete("/api/admin/users/9999")
+    .set("Authorization", `Bearer ${token}`);
+
+  expect(response.status).toBe(404);
+  expect(response.body).toMatchObject({
+    error: "Not Found",
+    message: "User not found",
+  });
+});
 });
