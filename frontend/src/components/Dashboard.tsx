@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Bar, Line, Pie, Bubble } from "react-chartjs-2";
+import type { Chart, BubbleDataPoint, PointElement } from "chart.js";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
 import { useDashboardStats, type DashboardFilters } from "../hooks/useDashboardStats";
@@ -14,21 +15,26 @@ function fmtRev(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
+interface ProductBubblePoint extends BubbleDataPoint {
+  name: string;
+}
+
 const bubbleLabelPlugin = {
   id: "productBubbleLabels",
-  afterDatasetsDraw(chart: any) {
-    const ctx = chart.ctx as CanvasRenderingContext2D;
+  afterDatasetsDraw(chart: Chart) {
+    const ctx = chart.ctx;
     ctx.save();
-    chart.data.datasets.forEach((dataset: any, dsIdx: number) => {
-      chart.getDatasetMeta(dsIdx).data.forEach((point: any, j: number) => {
-        const raw = dataset.data[j] as any;
+    chart.data.datasets.forEach((dataset, dsIdx: number) => {
+      chart.getDatasetMeta(dsIdx).data.forEach((element, j: number) => {
+        const point = element as PointElement;
+        const raw = dataset.data[j] as unknown as ProductBubblePoint;
         const { x, y } = point;
-        const r: number = point.options?.radius ?? 14;
+        const r: number = (point.options as { radius?: number }).radius ?? 14;
 
         ctx.textAlign = "center";
         ctx.font = "8px sans-serif";
         ctx.fillStyle = "#9ca3af";
-        ctx.fillText(fmtRev(Number(raw.y)), x, y + r + 10);
+        ctx.fillText(fmtRev(raw.y), x, y + r + 10);
       });
     });
     ctx.restore();
