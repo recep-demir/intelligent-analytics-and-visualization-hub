@@ -63,6 +63,12 @@ function VerticalLegend({ minV, maxV, agg, label }: { minV: number; maxV: number
   );
 }
 
+interface TooltipState {
+  text: string;
+  x: number;
+  y: number;
+}
+
 interface Props {
   data: { name: string; value: number; orders?: number }[];
   aggregation?: string;
@@ -70,7 +76,7 @@ interface Props {
 }
 
 export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
-  const [tooltip, setTooltip] = useState<string | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const lookup: Record<string, number> = {};
   const ordersLookup: Record<string, number> = {};
@@ -87,19 +93,33 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
   const MARITIMES = ["New Brunswick", "Nova Scotia", "Prince Edward Island", "Newfoundland and Labrador", "Newfoundland"];
   const hasMaritimeData = MARITIMES.some(p => (lookup[normalizeProvince(p)] ?? 0) > 0);
 
+  function buildTooltip(rawName: string, name: string, val: number): string {
+    const orders = ordersLookup[name];
+    const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
+    return `${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${ordersStr}`;
+  }
+
   return (
     <div className="w-full">
-      <div className="h-8 mb-2 flex items-center justify-center">
-        {tooltip && (
-          <span className="text-sm font-bold text-white bg-gray-700 border border-gray-500 px-4 py-1.5 rounded-lg shadow-lg">
-            {tooltip}
-          </span>
-        )}
-      </div>
-
       <div className="flex items-stretch gap-4">
         <div className="flex-1 relative">
-          <div className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117]">
+          <div
+            className="rounded-xl overflow-hidden border border-gray-800/60 bg-[#0d1117] relative"
+            onMouseMove={e => {
+              if (!tooltip) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTooltip(t => t ? { ...t, x: e.clientX - rect.left, y: e.clientY - rect.top } : null);
+            }}
+          >
+            {tooltip && (
+              <div
+                className="pointer-events-none absolute z-20 text-sm font-bold text-white bg-gray-800 border border-gray-500 px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap"
+                style={{ left: tooltip.x + 12, top: tooltip.y - 36 }}
+              >
+                {tooltip.text}
+              </div>
+            )}
+
             <ComposableMap
               projection="geoAzimuthalEqualArea"
               projectionConfig={{ rotate: [96, -60, 0], scale: 500 }}
@@ -123,10 +143,9 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                         fillOpacity={val ? 0.9 : 0.4}
                         stroke="#374151"
                         strokeWidth={0.4}
-                        onMouseEnter={() => {
-                          const rev = revenueLookup[name];
-                          const revStr = rev !== undefined ? `  ·  ${formatVal(rev)}` : "";
-                          setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${revStr}`);
+                        onMouseEnter={e => {
+                          const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
+                          setTooltip({ text: buildTooltip(rawName, name, val), x: e.clientX - rect.left, y: e.clientY - rect.top });
                         }}
                         onMouseLeave={() => setTooltip(null)}
                         style={{
@@ -148,12 +167,13 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                     stroke="#0d1117"
                     strokeWidth={0.6}
                     style={{ cursor: "pointer" }}
-                    onMouseEnter={() => {
+                    onMouseEnter={e => {
                       const normProv = normalizeProvince(province);
                       const val = lookup[normProv] ?? 0;
-                      const rev = ordersLookup[normProv];
-                      const revStr = rev !== undefined ? `  ·  ${formatVal(rev, "count")} orders` : "";
-                      setTooltip(`${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${revStr}`);
+                      const orders = ordersLookup[normProv];
+                      const ordersStr = orders !== undefined ? `  ·  ${formatVal(orders, "count")} orders` : "";
+                      const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
+                      setTooltip({ text: `${capital} (${province})${val ? `  ·  ${formatVal(val, aggregation)}` : ""}${ordersStr}`, x: e.clientX - rect.left, y: e.clientY - rect.top });
                     }}
                     onMouseLeave={() => setTooltip(null)}
                   />
@@ -196,10 +216,9 @@ export function CanadaMap({ data, aggregation, legend = "Value" }: Props) {
                           fillOpacity={val ? 0.9 : 0.35}
                           stroke="#374151"
                           strokeWidth={0.8}
-                          onMouseEnter={() => {
-                            const rev = ordersLookup[name];
-                            const revStr = rev !== undefined ? `  ·  ${formatVal(rev, "count")} orders` : "";
-                            setTooltip(`${rawName}  ·  ${val ? formatVal(val, aggregation) : "No data"}${revStr}`);
+                          onMouseEnter={e => {
+                            const rect = (e.currentTarget as SVGElement).closest(".rounded-xl")!.getBoundingClientRect();
+                            setTooltip({ text: buildTooltip(rawName, name, val), x: e.clientX - rect.left, y: e.clientY - rect.top });
                           }}
                           onMouseLeave={() => setTooltip(null)}
                           style={{
