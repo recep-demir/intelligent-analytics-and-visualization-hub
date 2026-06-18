@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Bar, Line } from "react-chartjs-2";
 import { KpiCard } from "./KpiCard";
 import { CanadaMap } from "./CanadaMap";
@@ -22,12 +22,18 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   const [filters, setFilters] = useState<DashboardFilters>(
     initialFilters ?? { yearFrom: null, yearTo: null, province: null, status: null, category: null }
   );
+  useEffect(() => {
+  if (initialFilters) {
+    setFilters(initialFilters);
+  }
+}, [initialFilters]);
   const { data, loading, error } = useDashboardStats(filters);
   const { categories, provinces, statuses, years } = useFilterOptions();
 
   function set(key: keyof DashboardFilters, raw: string) {
     const isYear = key === "yearFrom" || key === "yearTo";
     const value = raw === "" ? null : isYear ? Number(raw) : raw;
+    setShareUrl(null);   
     setFilters(prev => {
       const next = { ...prev, [key]: value };
       if (next.yearFrom && next.yearTo && next.yearFrom > next.yearTo) {
@@ -38,6 +44,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
   }
 
   function clearFilters() {
+    setShareUrl(null);   
     setFilters({ yearFrom: null, yearTo: null, province: null, status: null, category: null });
   }
 
