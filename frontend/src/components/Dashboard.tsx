@@ -87,11 +87,15 @@ export function Dashboard({
     const isYear = key === "yearFrom" || key === "yearTo";
     const value = raw === "" ? null : isYear ? Number(raw) : raw;
     setShareUrl(null);
-    setFilters((prev) => {
-      // Cast as any to bypass TypeScript's restrictive dynamic key mapping check
-      const next = { ...prev, [key]: value } as any;
 
-      // Explicitly check for truthy values and cast to Number to clear the comparison errors
+    setFilters((prev) => {
+      // 1. Shallow copy the previous filters object
+      const next = { ...prev };
+
+      // 2. Direct bracket notation assignment using 'any' cast to shut down type mismatch warnings
+      (next as any)[key] = value;
+
+      // 3. Keep your year validation logic safe and sound
       if (
         next.yearFrom &&
         next.yearTo &&
@@ -99,7 +103,8 @@ export function Dashboard({
       ) {
         next.yearTo = next.yearFrom;
       }
-      return next as DashboardFilters;
+
+      return next;
     });
   }
 
