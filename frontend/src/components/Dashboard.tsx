@@ -344,7 +344,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
         </div>
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4">
           <div className="relative h-64 md:h-96">
-            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions("Top 8 Provinces by Orders", "Order Count", "Province"), maintainAspectRatio: false }} />
+            <Bar data={topProvincesChart} options={{ ...horizontalBarOptions(filters.province ? `Orders — ${filters.province}` : "Top 8 Provinces by Orders", filters.province ? "Number of Orders" : "Order Count", "Province"), maintainAspectRatio: false }} />
           </div>
         </div>
       </div>
