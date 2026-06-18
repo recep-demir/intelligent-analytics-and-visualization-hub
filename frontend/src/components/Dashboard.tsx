@@ -24,14 +24,8 @@ const bubbleLabelPlugin = {
         const raw = dataset.data[j] as any;
         const { x, y } = point;
         const r: number = point.options?.radius ?? 14;
-        const name: string = raw.name ?? "";
-        const truncated = name.length > 15 ? name.slice(0, 14) + "…" : name;
 
         ctx.textAlign = "center";
-        ctx.font = "bold 9px sans-serif";
-        ctx.fillStyle = "#f9fafb";
-        ctx.fillText(truncated, x, y - r - 5);
-
         ctx.font = "8px sans-serif";
         ctx.fillStyle = "#9ca3af";
         ctx.fillText(fmtRev(Number(raw.y)), x, y + r + 10);
@@ -358,7 +352,7 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
             plugins={[bubbleLabelPlugin]}
             options={{
               maintainAspectRatio: false,
-              layout: { padding: { top: 36, bottom: 8 } },
+              layout: { padding: { top: 10, bottom: 8 } },
               plugins: {
                 legend: { position: "top", labels: { color: "#d1d5db", padding: 16 } },
                 tooltip: {
@@ -378,11 +372,11 @@ export function Dashboard({ initialFilters, viewerMode = false , canShare = fals
                     color: "#9ca3af",
                     stepSize: 1,
                     font: { size: 9 },
-                    maxRotation: 35,
+                    maxRotation: 0,
                     callback: (val) => {
                       const label = bubbleTickLabels.current[val as number];
                       if (!label) return "";
-                      return label.length > 12 ? label.slice(0, 11) + "…" : label;
+                      return label.split(" ");
                     },
                   },
                   grid: { color: "#374151" },
