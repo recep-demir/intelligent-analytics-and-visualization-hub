@@ -98,8 +98,10 @@ function buildOrderLevelWhere(
   const replacements = buildReplacements(args);
 
   if (hasText(args.status)) {
-  conditions.push("LOWER(o.status) = LOWER(:status)");
-}
+    conditions.push("LOWER(o.status) = LOWER(:status)");
+  } else if (options.useMonthlyRevenueDefaults) {
+    conditions.push("o.status IN ('paid','shipped')");
+  }
 
   if (hasYear(args.year)) {
     conditions.push("strftime('%Y', o.createdAt) = CAST(:year AS TEXT)");
