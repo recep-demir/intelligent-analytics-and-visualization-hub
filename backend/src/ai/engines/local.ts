@@ -70,9 +70,11 @@ export class LocalEngine implements AIEngine {
     // Status has few distinct values — donut shows proportions better than bar
     if (/ by status\b/i.test(q)) return "donut";
 
-    // Explicit comparison — "by <non-geographic dimension>" or "compare"
-    if (/ by (category|product|region)\b/i.test(q) ||
-        /\b(compare|comparison|ranking|rank)\b/.test(q)) return "bar";
+    // Explicit comparison keywords always imply bar. Dimension-based routing
+    // (category/productGroup/product/province/status) is left to the more specific,
+    // superlative-aware blocks below — matching this here would short-circuit them
+    // (e.g. "by category" or "by product group" with no ranking should fall through to treemap).
+    if (/\b(compare|comparison|ranking|rank)\b/.test(q)) return "bar";
 
     // Province queries: ranking/superlative → bar; geographic overview → map
     if (/\bprovince[s]?\b/i.test(q)) {

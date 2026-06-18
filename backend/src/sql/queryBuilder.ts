@@ -509,7 +509,9 @@ function buildBothMetricsQuery(q: ResolvedQuery): BuiltQuery {
 // Accepts only ResolvedQuery — normalization is structurally mandatory.
 // ---------------------------------------------------------------------------
 export function build(q: ResolvedQuery): BuiltQuery {
-  if (q.metric === 'both') return buildBothMetricsQuery(q)
+  // Grid lists raw order rows and already includes subtotal (revenue) + total (tax) as
+  // separate columns regardless of metric — it never aggregates, so 'both' doesn't apply.
+  if (q.metric === 'both' && q.chartType !== 'grid') return buildBothMetricsQuery(q)
 
   const aggExpr = buildAggregateExpression(q.aggregation, orderMetricExpr(q))
   const { where, replacements } = buildWhereClause(q.filters)

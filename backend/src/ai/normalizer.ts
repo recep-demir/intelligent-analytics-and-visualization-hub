@@ -137,42 +137,65 @@ function normalizeProvince(value: string): string {
 function detectMetric(question: string, configMetric?: string): Metric | undefined {
   const q = question.toLowerCase()
 
-  // 'both' is checked from question text FIRST — Gemini consistently conflates
-  // "revenue and taxes" with "grand total", so we override before trusting configMetric.
   // hasTax excludes compound nouns like "tax year" / "tax rate" to avoid false positives.
   const hasRevenue = /\b(revenue|subtotal|sales)\b/.test(q)
   const hasTax     = /\b(taxes|tax\s+(?:amount|collected|paid|revenue))\b/.test(q) ||
                      (/\btax\b/.test(q) && !/\btax\s+(?:year|rate|code|bracket)\b/.test(q))
+  const hasTotal   = /\b(grand total|total amount|total charged|total bill|total paid|gross total)\b/.test(q)
   const hasJoin    = /\b(vs\.?|versus|alongside|compare|both|and)\b/.test(q)
+
+  // 'both' is checked from question text FIRST — Gemini consistently conflates
+  // "revenue and taxes" with "grand total", so we override before trusting configMetric.
   if (hasRevenue && hasTax && hasJoin) return 'both'
 
-  // For 'tax': cross-check — if question explicitly says "revenue" but has no clear tax-metric
-  // phrase, Gemini likely misread a compound like "tax year" as the metric. Override to default.
-  if (configMetric === 'tax') {
-    const explicitRevenue = /\b(revenue|subtotal|sales)\b/.test(q)
-    const explicitTax     = /\b(taxes|tax\s+(?:amount|collected|paid|revenue))\b/.test(q)
-    if (explicitRevenue && !explicitTax) return undefined
-    return 'tax'
-  }
+  // Explicit revenue with no competing tax/total phrase always wins — regardless of what
+  // any AI engine returned. Guards against Gemini misreading compounds like "tax year" as
+  // a tax/total metric (it can hallucinate either one), without special-casing per value.
+  if (hasRevenue && !hasTax && !hasTotal) return undefined
 
-  // For all other AI-provided metrics, trust them
-  if (configMetric === 'total' || configMetric === 'subtotal' || configMetric === 'both') {
+  // Otherwise trust the AI-provided value
+  if (configMetric === 'tax' || configMetric === 'total' || configMetric === 'subtotal' || configMetric === 'both') {
     return configMetric as Metric
   }
 
   if (hasTax) return 'tax'
-  if (/\b(grand total|total amount|total charged|total bill|total paid|gross total)\b/.test(q)) return 'total'
+  if (hasTotal) return 'total'
   return undefined  // undefined → SQL builder defaults to o.subtotal
 }
 
 // Dimensions with a known small number of distinct values — no default LIMIT needed
 const LOW_CARDINALITY: GroupByValue[] = ['province', 'status', 'month', 'year', 'total']
 
+// ---------------------------------------------------------------------------
+// detectExplicitChartType — when the question literally names a chart type
+// ("as a stat", "as a bar chart"), that always wins over whatever the AI
+// inferred from other words. Comparison words like "vs"/"versus" should only
+// drive metric detection (both), never override an explicit format request —
+// Gemini conflates the two ("revenue vs tax... as a stat" → bar, ignoring "stat").
+// This check is deterministic and runs regardless of which AI engine resolved
+// the query, so it can't drift the way a prompt-only fix would.
+// ---------------------------------------------------------------------------
+function detectExplicitChartType(question: string): ChartType | undefined {
+  const q = question.toLowerCase()
+  if (/\bas an? (?:single\s+)?stat(?:\s+(?:chart|card|number|value))?\b/.test(q)) return 'stat'
+  if (/\bas an? (?:kpi|single\s+number)\b/.test(q))                              return 'stat'
+  if (/\bas an? heatmap\b/.test(q))                                              return 'heatmap'
+  if (/\bas an? treemap\b/.test(q))                                              return 'treemap'
+  if (/\bas an? donut(?:\s+chart)?\b/.test(q))                                   return 'donut'
+  if (/\bas an? pie(?:\s+chart)?\b/.test(q))                                     return 'pie'
+  if (/\bas an? bar(?:\s+(?:chart|graph))?\b/.test(q))                           return 'bar'
+  if (/\bas an? line(?:\s+(?:chart|graph))?\b/.test(q))                          return 'line'
+  if (/\bas an? (?:table|grid)\b/.test(q))                                       return 'grid'
+  if (/\bas an? map\b/.test(q))                                                  return 'map'
+  return undefined
+}
+
 // normalize — the single entry point.
 // Transforms raw AI ChartConfig + original question into a ResolvedQuery
 // the SQL builder can trust completely.
 // ---------------------------------------------------------------------------
 export function normalize(config: ChartConfig, question: string): ResolvedQuery {
+  const chartTypeInput = detectExplicitChartType(question) ?? config.chartType
   const rawGroupBy = config.groupBy as GroupByValue | undefined
 
   // Normalize province filter values before multi-series detection
@@ -186,7 +209,7 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
   let adjustedGroupBy = rawGroupBy
   let overrideLimit: number | undefined   // set when question text implies top-N that AI missed
 
-  if (config.chartType === 'line') {
+  if (chartTypeInput === 'line') {
     const eqByField: Record<string, string[]> = {}
     for (const f of normalizedFilters) {
       if (f.operator === 'eq' && f.field !== 'country') {
@@ -239,7 +262,7 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
     }
   }
 
-  const { chartType, groupBy } = coerce(config.chartType, adjustedGroupBy)
+  const { chartType, groupBy } = coerce(chartTypeInput, adjustedGroupBy)
 
   const filters = (() => {
     const hasCountry = normalizedFilters.some(f => f.field === 'country')
@@ -285,11 +308,6 @@ export function normalize(config: ChartConfig, question: string): ResolvedQuery 
 
   if (chartType === 'heatmap') {
     resolved.groupBy2 = inferGroupBy2(question)
-  }
-
-  // Treemap can't render dual-metric series — silently promote to bar
-  if (resolved.metric === 'both' && resolved.chartType === 'treemap') {
-    resolved.chartType = 'bar'
   }
 
   return resolved
