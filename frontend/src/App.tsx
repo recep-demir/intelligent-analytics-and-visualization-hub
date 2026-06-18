@@ -121,7 +121,6 @@ interface NLQueryResponse {
   latencyMs?: number;
 }
 
-
 function heatColor(t: number): string {
   const r = Math.round(59 + (239 - 59) * t);
   const g = Math.round(130 + (68 - 130) * t);
@@ -189,10 +188,13 @@ function parseChartConfig(raw: any, fallbackTitle: string): ChartConfig {
 function generateTitle(config: ChartConfig): string {
   const agg = config.aggregation ?? "sum";
   const metricBase =
-    config.metric === "tax"   ? "Tax" :
-    config.metric === "total" ? "Grand Total" :
-    config.metric === "both"  ? "Revenue & Tax" :
-    "Revenue";
+    config.metric === "tax"
+      ? "Tax"
+      : config.metric === "total"
+        ? "Grand Total"
+        : config.metric === "both"
+          ? "Revenue & Tax"
+          : "Revenue";
   const metric =
     agg === "count"
       ? "Orders"
@@ -264,15 +266,18 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
   const agg = chartData.chartConfig.aggregation;
 
   function renderPieOrDonut(records: any[], isDonut: boolean) {
-    const total = records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
+    const total =
+      records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
     const data = {
       labels: records.map((r: any) => r.name ?? ""),
-      datasets: [{
-        data: records.map((r: any) => r.value ?? 0),
-        backgroundColor: CHART_COLORS,
-        borderColor: "#0f172a",
-        borderWidth: 1,
-      }],
+      datasets: [
+        {
+          data: records.map((r: any) => r.value ?? 0),
+          backgroundColor: CHART_COLORS,
+          borderColor: "#0f172a",
+          borderWidth: 1,
+        },
+      ],
     };
     const options = {
       responsive: true,
@@ -292,10 +297,11 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     return (
       <div className="flex items-center gap-10 py-4 w-full justify-center">
         <div className="relative shrink-0" style={{ width: 200, height: 200 }}>
-          {isDonut
-            ? <Doughnut data={data} options={options} />
-            : <Pie data={data} options={options} />
-          }
+          {isDonut ? (
+            <Doughnut data={data} options={options} />
+          ) : (
+            <Pie data={data} options={options} />
+          )}
           {isDonut && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-xl font-bold font-mono text-white text-center leading-tight">
@@ -309,7 +315,9 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
             <div key={i} className="flex items-center gap-3">
               <span
                 className="w-3 h-3 rounded-sm shrink-0"
-                style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                style={{
+                  backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+                }}
               />
               <span className="text-sm text-gray-200 font-medium flex-1">
                 {record.name ?? `Item ${i + 1}`}
@@ -329,21 +337,28 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
     if (isGrouped) {
       // Grouped bar: pivot {series, name, value} into one dataset per series
-      const seriesNames = [...new Set(records.map((r: any) => r.series as string))];
+      const seriesNames = [
+        ...new Set(records.map((r: any) => r.series as string)),
+      ];
       // Order labels by Revenue value DESC so highest-revenue items appear first
       const revMap = new Map<string, number>(
-        records.filter((r: any) => r.series === seriesNames[0]).map((r: any) => [r.name as string, Number(r.value)])
+        records
+          .filter((r: any) => r.series === seriesNames[0])
+          .map((r: any) => [r.name as string, Number(r.value)]),
       );
-      const labels = [...new Set(records.map((r: any) => r.name as string))]
-        .sort((a, b) => (revMap.get(b) ?? 0) - (revMap.get(a) ?? 0));
+      const labels = [
+        ...new Set(records.map((r: any) => r.name as string)),
+      ].sort((a, b) => (revMap.get(b) ?? 0) - (revMap.get(a) ?? 0));
 
       const datasets = seriesNames.map((sName, i) => {
         const valMap = new Map<string, number>(
-          records.filter((r: any) => r.series === sName).map((r: any) => [r.name as string, Number(r.value)])
+          records
+            .filter((r: any) => r.series === sName)
+            .map((r: any) => [r.name as string, Number(r.value)]),
         );
         return {
           label: sName,
-          data: labels.map(l => valMap.get(l) ?? 0),
+          data: labels.map((l) => valMap.get(l) ?? 0),
           backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
           borderRadius: 3,
         };
@@ -359,7 +374,8 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           legend: { display: true, labels: { color: "#94a3b8" } },
           tooltip: {
             callbacks: {
-              label: (ctx: any) => `${ctx.dataset.label}: ${formatVal(ctx.parsed.x, agg)}`,
+              label: (ctx: any) =>
+                `${ctx.dataset.label}: ${formatVal(ctx.parsed.x, agg)}`,
             },
           },
           datalabels: {
@@ -372,13 +388,23 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           },
         },
         scales: {
-          x: { ticks: { color: "#94a3b8", callback: (v: any) => formatAxis(Number(v), agg) }, grid: { color: "#1e293b" } },
+          x: {
+            ticks: {
+              color: "#94a3b8",
+              callback: (v: any) => formatAxis(Number(v), agg),
+            },
+            grid: { color: "#1e293b" },
+          },
           y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
         },
       };
       return (
         <div style={{ height }}>
-          <Bar data={{ labels, datasets }} options={options} plugins={[ChartDataLabels]} />
+          <Bar
+            data={{ labels, datasets }}
+            options={options}
+            plugins={[ChartDataLabels]}
+          />
         </div>
       );
     }
@@ -387,11 +413,13 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     const height = Math.max(records.length * 48 + 24, 200);
     const data = {
       labels: records.map((r: any) => r.name ?? r.label ?? ""),
-      datasets: [{
-        data: records.map((r: any) => r.value ?? 0),
-        backgroundColor: CHART_COLORS,
-        borderRadius: 4,
-      }],
+      datasets: [
+        {
+          data: records.map((r: any) => r.value ?? 0),
+          backgroundColor: CHART_COLORS,
+          borderRadius: 4,
+        },
+      ],
     };
     const options = {
       indexAxis: "y" as const,
@@ -415,7 +443,10 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
       scales: {
         x: {
-          ticks: { color: "#94a3b8", callback: (v: any) => formatAxis(Number(v), agg) },
+          ticks: {
+            color: "#94a3b8",
+            callback: (v: any) => formatAxis(Number(v), agg),
+          },
           grid: { color: "#1e293b" },
         },
         y: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
@@ -440,15 +471,19 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
     // Multi-series: records carry a 'series' field (e.g. province or status)
     if ("series" in points[0]) {
-      const seriesNames = [...new Set(points.map((d: any) => d.series as string))].sort();
+      const seriesNames = [
+        ...new Set(points.map((d: any) => d.series as string)),
+      ].sort();
       const timeLabels = [...new Set(points.map((d: any) => d.name as string))];
       const datasets = seriesNames.map((sName, i) => {
         const rowMap = new Map(
-          points.filter((d: any) => d.series === sName).map((d: any) => [d.name, Number(d.value) || 0])
+          points
+            .filter((d: any) => d.series === sName)
+            .map((d: any) => [d.name, Number(d.value) || 0]),
         );
         return {
           label: sName,
-          data: timeLabels.map(t => rowMap.get(t) ?? 0),
+          data: timeLabels.map((t) => rowMap.get(t) ?? 0),
           borderColor: CHART_COLORS[i % CHART_COLORS.length],
           backgroundColor: `${CHART_COLORS[i % CHART_COLORS.length]}26`,
           tension: 0.4,
@@ -463,13 +498,17 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           legend: { display: true, labels: { color: "#94a3b8" } },
           tooltip: {
             callbacks: {
-              label: (ctx: any) => `${ctx.dataset.label}: ${formatVal(ctx.parsed.y, agg)}`,
+              label: (ctx: any) =>
+                `${ctx.dataset.label}: ${formatVal(ctx.parsed.y, agg)}`,
             },
           },
         },
         scales: {
           x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-          y: { ticks: { color: "#94a3b8", callback: tickCallback }, grid: { color: "#1e293b" } },
+          y: {
+            ticks: { color: "#94a3b8", callback: tickCallback },
+            grid: { color: "#1e293b" },
+          },
         },
       };
       return (
@@ -512,13 +551,17 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           legend: { display: true, labels: { color: "#94a3b8" } },
           tooltip: {
             callbacks: {
-              label: (ctx: any) => `${ctx.dataset.label}: ${formatVal(ctx.parsed.y, agg)}`,
+              label: (ctx: any) =>
+                `${ctx.dataset.label}: ${formatVal(ctx.parsed.y, agg)}`,
             },
           },
         },
         scales: {
           x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-          y: { ticks: { color: "#94a3b8", callback: tickCallback }, grid: { color: "#1e293b" } },
+          y: {
+            ticks: { color: "#94a3b8", callback: tickCallback },
+            grid: { color: "#1e293b" },
+          },
         },
       };
       return (
@@ -535,16 +578,18 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
     const data = {
       labels: points.map((d: any) => d.name ?? d.year ?? ""),
-      datasets: [{
-        label: "Value",
-        data: points.map(getValue),
-        borderColor: "#6366f1",
-        backgroundColor: "rgba(99,102,241,0.15)",
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointBackgroundColor: "#818cf8",
-      }],
+      datasets: [
+        {
+          label: "Value",
+          data: points.map(getValue),
+          borderColor: "#6366f1",
+          backgroundColor: "rgba(99,102,241,0.15)",
+          fill: true,
+          tension: 0.4,
+          pointRadius: 3,
+          pointBackgroundColor: "#818cf8",
+        },
+      ],
     };
 
     const options = {
@@ -560,7 +605,10 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
       scales: {
         x: { ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
-        y: { ticks: { color: "#94a3b8", callback: tickCallback }, grid: { color: "#1e293b" } },
+        y: {
+          ticks: { color: "#94a3b8", callback: tickCallback },
+          grid: { color: "#1e293b" },
+        },
       },
     };
 
@@ -577,9 +625,16 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       return (
         <div className="w-full flex gap-4 py-6 justify-center">
           {records.map((r: any) => (
-            <div key={r.name} className="flex-1 flex flex-col items-center gap-2 bg-gray-800/30 rounded-xl p-6">
-              <span className="text-2xl font-black text-white tabular-nums">{formatVal(Number(r.value), agg)}</span>
-              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-300/80">{r.name}</span>
+            <div
+              key={r.name}
+              className="flex-1 flex flex-col items-center gap-2 bg-gray-800/30 rounded-xl p-6"
+            >
+              <span className="text-2xl font-black text-white tabular-nums">
+                {formatVal(Number(r.value), agg)}
+              </span>
+              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-300/80">
+                {r.name}
+              </span>
             </div>
           ))}
         </div>
@@ -587,23 +642,24 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     }
 
     const val = records[0]?.value ?? 0;
-    const label = (records[0]?.name && records[0].name !== String(val))
-      ? records[0].name
-      : (chartData.chartConfig.aggregation ?? "Total");
+    const label =
+      records[0]?.name && records[0].name !== String(val)
+        ? records[0].name
+        : (chartData.chartConfig.aggregation ?? "Total");
     const data = {
       datasets: [
         {
           data: [1],
-          backgroundColor: ['rgba(99,102,241,0.85)'],
+          backgroundColor: ["rgba(99,102,241,0.85)"],
           borderWidth: 0,
-          hoverBackgroundColor: ['rgba(99,102,241,0.85)'],
+          hoverBackgroundColor: ["rgba(99,102,241,0.85)"],
         },
       ],
     };
     const options = {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '74%',
+      cutout: "74%",
       animation: { duration: 900 },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
     };
@@ -663,32 +719,38 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
   function renderTreemap(records: any[]) {
     if (records.length === 0) return null;
-    const total = records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
+    const total =
+      records.reduce((s: number, r: any) => s + (r.value ?? 0), 0) || 1;
     const data = {
-      datasets: [{
-        type: 'treemap' as const,
-        tree: records,
-        key: 'value',
-        groups: ['name'],
-        spacing: 2,
-        borderWidth: 0,
-        borderRadius: 4,
-        backgroundColor(ctx: any) {
-          if (ctx.type !== 'data') return 'transparent';
-          return CHART_COLORS[ctx.dataIndex % CHART_COLORS.length];
-        },
-        labels: {
-          display: true,
-          color: ['rgba(255,255,255,0.85)', 'white'] as any,
-          font: [{ size: 14, weight: 'bold' as const }, { size: 20, weight: 'bold' as const }] as any,
-          overflow: 'fit' as const,
-          position: 'middle' as const,
-          formatter(ctx: any) {
-            if (ctx.type !== 'data') return [];
-            return [ctx.raw.g ?? '', formatVal(ctx.raw.v, agg)];
+      datasets: [
+        {
+          type: "treemap" as const,
+          tree: records,
+          key: "value",
+          groups: ["name"],
+          spacing: 2,
+          borderWidth: 0,
+          borderRadius: 4,
+          backgroundColor(ctx: any) {
+            if (ctx.type !== "data") return "transparent";
+            return CHART_COLORS[ctx.dataIndex % CHART_COLORS.length];
+          },
+          labels: {
+            display: true,
+            color: ["rgba(255,255,255,0.85)", "white"] as any,
+            font: [
+              { size: 14, weight: "bold" as const },
+              { size: 20, weight: "bold" as const },
+            ] as any,
+            overflow: "fit" as const,
+            position: "middle" as const,
+            formatter(ctx: any) {
+              if (ctx.type !== "data") return [];
+              return [ctx.raw.g ?? "", formatVal(ctx.raw.v, agg)];
+            },
           },
         },
-      }],
+      ],
     };
     const options = {
       responsive: true,
@@ -697,7 +759,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: () => '',
+            title: () => "",
             label(ctx: any) {
               const raw = ctx.raw;
               const pct = ((raw.v / total) * 100).toFixed(1);
@@ -709,7 +771,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     };
     return (
       <div className="w-full" style={{ height: 380 }}>
-        <Chart type='treemap' data={data as any} options={options as any} />
+        <Chart type="treemap" data={data as any} options={options as any} />
       </div>
     );
   }
@@ -719,17 +781,32 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
     const dim2Key = "month" in records[0] ? "month" : "year";
     const dim1Key =
-      Object.keys(records[0]).find((k) => k !== "value" && k !== dim2Key) ?? "province";
+      Object.keys(records[0]).find((k) => k !== "value" && k !== dim2Key) ??
+      "province";
 
     const MONTH_ABBR: Record<string, string> = {
-      "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr",
-      "05": "May", "06": "Jun", "07": "Jul", "08": "Aug",
-      "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec",
+      "01": "Jan",
+      "02": "Feb",
+      "03": "Mar",
+      "04": "Apr",
+      "05": "May",
+      "06": "Jun",
+      "07": "Jul",
+      "08": "Aug",
+      "09": "Sep",
+      "10": "Oct",
+      "11": "Nov",
+      "12": "Dec",
     };
-    const colLabel = (v: string) => dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v;
+    const colLabel = (v: string) =>
+      dim2Key === "month" ? (MONTH_ABBR[v] ?? v) : v;
 
-    const dim1Values = [...new Set(records.map((d: any) => d[dim1Key] as string))].sort();
-    const dim2Values = [...new Set(records.map((d: any) => String(d[dim2Key])))].sort();
+    const dim1Values = [
+      ...new Set(records.map((d: any) => d[dim1Key] as string)),
+    ].sort();
+    const dim2Values = [
+      ...new Set(records.map((d: any) => String(d[dim2Key]))),
+    ].sort();
     const dim2Labels = dim2Values.map(colLabel);
 
     const allValues = records.map((d: any) => Number(d.value) || 0);
@@ -744,30 +821,34 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     }));
 
     const dim1Label: Record<string, string> = {
-      province: "Province", category: "Category",
-      status: "Status", productGroup: "Product Group",
+      province: "Province",
+      category: "Category",
+      status: "Status",
+      productGroup: "Product Group",
     };
 
     const data = {
-      datasets: [{
-        type: 'matrix' as const,
-        data: matrixData,
-        backgroundColor(ctx: any) {
-          const val = (ctx.raw as any)?.v ?? 0;
-          if (!val) return 'rgba(59,130,246,0.12)';
-          return heatColor((val - minV) / range);
+      datasets: [
+        {
+          type: "matrix" as const,
+          data: matrixData,
+          backgroundColor(ctx: any) {
+            const val = (ctx.raw as any)?.v ?? 0;
+            if (!val) return "rgba(59,130,246,0.12)";
+            return heatColor((val - minV) / range);
+          },
+          borderWidth: 1,
+          borderColor: "#0f172a",
+          width({ chart }: any) {
+            const area = chart.chartArea;
+            return area ? area.width / dim2Values.length - 2 : 10;
+          },
+          height({ chart }: any) {
+            const area = chart.chartArea;
+            return area ? area.height / dim1Values.length - 2 : 10;
+          },
         },
-        borderWidth: 1,
-        borderColor: '#0f172a',
-        width({ chart }: any) {
-          const area = chart.chartArea;
-          return area ? (area.width / dim2Values.length) - 2 : 10;
-        },
-        height({ chart }: any) {
-          const area = chart.chartArea;
-          return area ? (area.height / dim1Values.length) - 2 : 10;
-        },
-      }],
+      ],
     };
 
     const options = {
@@ -777,7 +858,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: () => '',
+            title: () => "",
             label(ctx: any) {
               const raw = ctx.raw as any;
               return `${raw.y} / ${raw.x}: ${formatVal(raw.v, agg)}`;
@@ -787,22 +868,22 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
       scales: {
         x: {
-          type: 'category' as const,
+          type: "category" as const,
           labels: dim2Labels,
           offset: true,
-          ticks: { color: '#94a3b8' },
+          ticks: { color: "#94a3b8" },
           grid: { display: false },
         },
         y: {
-          type: 'category' as const,
+          type: "category" as const,
           labels: [...dim1Values].reverse(),
           offset: true,
-          ticks: { color: '#94a3b8' },
+          ticks: { color: "#94a3b8" },
           grid: { display: false },
           title: {
             display: true,
             text: dim1Label[dim1Key] ?? dim1Key,
-            color: '#64748b',
+            color: "#64748b",
             font: { size: 11 },
           },
         },
@@ -814,7 +895,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     return (
       <div className="flex gap-4 w-full">
         <div className="flex-1" style={{ height }}>
-          <Chart type='matrix' data={data as any} options={options as any} />
+          <Chart type="matrix" data={data as any} options={options as any} />
         </div>
         <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
       </div>
@@ -845,54 +926,103 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
             <div className="rounded-xl border border-gray-800/60 bg-[#0d1117]">
               <ComposableMap
                 projection="geoAzimuthalEqualArea"
-                projectionConfig={{ rotate: [96, -63, 0], scale: 590, center: [6, 0] }}
+                projectionConfig={{
+                  rotate: [96, -63, 0],
+                  scale: 590,
+                  center: [6, 0],
+                }}
                 width={800}
                 height={430}
-                style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  overflow: "visible",
+                }}
               >
                 <Geographies geography={CANADA_GEO}>
                   {({ geographies }: { geographies: any[] }) =>
-                    geographies.map((geo: { rsmKey: string; properties: Record<string, unknown> }) => {
-                      const rawName = (geo.properties.name as string | null) ?? "";
-                      if (!rawName) return null;
-                      const name = normalizeProvince(rawName);
-                      const val = lookup[name] ?? 0;
-                      const t = val ? (val - minV) / range : 0;
-                      const isHovered = mapHovered === name;
-                      const anyHovered = mapHovered !== null;
-                      const opacity = anyHovered ? (isHovered ? 1.0 : 0.35) : val ? 0.9 : 0.4;
-                      return (
-                        <Geography
-                          key={geo.rsmKey}
-                          geography={geo}
-                          fill={val ? heatColor(t) : "#1e2939"}
-                          fillOpacity={opacity}
-                          stroke="#ffffff"
-                          strokeWidth={isHovered ? 1.5 : 0.5}
-                          onMouseEnter={() => {
-                            setMapHovered(name);
-                            setMapTooltip(`${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`);
-                          }}
-                          onMouseLeave={() => { setMapHovered(null); setMapTooltip(null); }}
-                          style={{
-                            default: { outline: "none" },
-                            hover: { outline: "none", cursor: "pointer" },
-                            pressed: { outline: "none" },
-                          }}
-                        />
-                      );
-                    })
+                    geographies.map(
+                      (geo: {
+                        rsmKey: string;
+                        properties: Record<string, unknown>;
+                      }) => {
+                        const rawName =
+                          (geo.properties.name as string | null) ?? "";
+                        if (!rawName) return null;
+                        const name = normalizeProvince(rawName);
+                        const val = lookup[name] ?? 0;
+                        const t = val ? (val - minV) / range : 0;
+                        const isHovered = mapHovered === name;
+                        const anyHovered = mapHovered !== null;
+                        const opacity = anyHovered
+                          ? isHovered
+                            ? 1.0
+                            : 0.35
+                          : val
+                            ? 0.9
+                            : 0.4;
+                        return (
+                          <Geography
+                            key={geo.rsmKey}
+                            geography={geo}
+                            fill={val ? heatColor(t) : "#1e2939"}
+                            fillOpacity={opacity}
+                            stroke="#ffffff"
+                            strokeWidth={isHovered ? 1.5 : 0.5}
+                            onMouseEnter={() => {
+                              setMapHovered(name);
+                              setMapTooltip(
+                                `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
+                              );
+                            }}
+                            onMouseLeave={() => {
+                              setMapHovered(null);
+                              setMapTooltip(null);
+                            }}
+                            style={{
+                              default: { outline: "none" },
+                              hover: { outline: "none", cursor: "pointer" },
+                              pressed: { outline: "none" },
+                            }}
+                          />
+                        );
+                      },
+                    )
                   }
                 </Geographies>
                 {PROVINCE_MARKERS.map(({ city, coords, lx, ly, anchor }) => (
                   <Marker key={city} coordinates={coords}>
-                    <line x1={0} y1={0} x2={lx} y2={ly} stroke="#9ca3af" strokeWidth={0.6} strokeOpacity={0.85} />
-                    <circle r={2.8} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.8} />
+                    <line
+                      x1={0}
+                      y1={0}
+                      x2={lx}
+                      y2={ly}
+                      stroke="#9ca3af"
+                      strokeWidth={0.6}
+                      strokeOpacity={0.85}
+                    />
+                    <circle
+                      r={2.8}
+                      fill="#ffffff"
+                      fillOpacity={0.95}
+                      stroke="#0d1117"
+                      strokeWidth={0.8}
+                    />
                     <text
                       textAnchor={anchor}
-                      x={lx + (anchor === "start" ? 3 : anchor === "end" ? -3 : 0)}
+                      x={
+                        lx +
+                        (anchor === "start" ? 3 : anchor === "end" ? -3 : 0)
+                      }
                       y={ly - 3}
-                      style={{ fontSize: "11px", fill: "#f9fafb", fontFamily: "sans-serif", fontWeight: 700, pointerEvents: "none" }}
+                      style={{
+                        fontSize: "11px",
+                        fill: "#f9fafb",
+                        fontFamily: "sans-serif",
+                        fontWeight: 700,
+                        pointerEvents: "none",
+                      }}
                     >
                       {city}
                     </text>
@@ -901,8 +1031,16 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
               </ComposableMap>
             </div>
             {(() => {
-              const MARITIMES = ["New Brunswick", "Nova Scotia", "Prince Edward Island", "Newfoundland and Labrador", "Newfoundland"];
-              const hasData = MARITIMES.some((p) => (lookup[normalizeProvince(p)] ?? 0) > 0);
+              const MARITIMES = [
+                "New Brunswick",
+                "Nova Scotia",
+                "Prince Edward Island",
+                "Newfoundland and Labrador",
+                "Newfoundland",
+              ];
+              const hasData = MARITIMES.some(
+                (p) => (lookup[normalizeProvince(p)] ?? 0) > 0,
+              );
               if (!hasData) return null;
               return (
                 <div className="absolute top-2 right-2 z-10 w-56 rounded-lg border border-gray-600/70 bg-[#0d1117]/90 overflow-hidden shadow-xl backdrop-blur-sm">
@@ -918,41 +1056,69 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
                   >
                     <Geographies geography={CANADA_GEO}>
                       {({ geographies }) =>
-                        geographies.map((geo: { rsmKey: string; properties: Record<string, unknown> }) => {
-                          const rawName = (geo.properties.name as string | null) ?? "";
-                          if (!rawName) return null;
-                          const name = normalizeProvince(rawName);
-                          const val = lookup[name] ?? 0;
-                          const t = val ? (val - minV) / range : 0;
-                          const isHovered = mapHovered === name;
-                          const anyHovered = mapHovered !== null;
-                          const opacity = anyHovered ? (isHovered ? 1.0 : 0.35) : val ? 0.9 : 0.35;
-                          return (
-                            <Geography
-                              key={geo.rsmKey}
-                              geography={geo}
-                              fill={val ? heatColor(t) : "#1e2939"}
-                              fillOpacity={opacity}
-                              stroke="#ffffff"
-                              strokeWidth={isHovered ? 1.5 : 0.5}
-                              onMouseEnter={() => {
-                                setMapHovered(name);
-                                setMapTooltip(`${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`);
-                              }}
-                              onMouseLeave={() => { setMapHovered(null); setMapTooltip(null); }}
-                              style={{
-                                default: { outline: "none" },
-                                hover: { outline: "none", fillOpacity: 1.0, strokeWidth: 2.0, cursor: "pointer" },
-                                pressed: { outline: "none" },
-                              }}
-                            />
-                          );
-                        })
+                        geographies.map(
+                          (geo: {
+                            rsmKey: string;
+                            properties: Record<string, unknown>;
+                          }) => {
+                            const rawName =
+                              (geo.properties.name as string | null) ?? "";
+                            if (!rawName) return null;
+                            const name = normalizeProvince(rawName);
+                            const val = lookup[name] ?? 0;
+                            const t = val ? (val - minV) / range : 0;
+                            const isHovered = mapHovered === name;
+                            const anyHovered = mapHovered !== null;
+                            const opacity = anyHovered
+                              ? isHovered
+                                ? 1.0
+                                : 0.35
+                              : val
+                                ? 0.9
+                                : 0.35;
+                            return (
+                              <Geography
+                                key={geo.rsmKey}
+                                geography={geo}
+                                fill={val ? heatColor(t) : "#1e2939"}
+                                fillOpacity={opacity}
+                                stroke="#ffffff"
+                                strokeWidth={isHovered ? 1.5 : 0.5}
+                                onMouseEnter={() => {
+                                  setMapHovered(name);
+                                  setMapTooltip(
+                                    `${rawName}  ·  ${val ? formatVal(val, agg) : "No data"}`,
+                                  );
+                                }}
+                                onMouseLeave={() => {
+                                  setMapHovered(null);
+                                  setMapTooltip(null);
+                                }}
+                                style={{
+                                  default: { outline: "none" },
+                                  hover: {
+                                    outline: "none",
+                                    fillOpacity: 1.0,
+                                    strokeWidth: 2.0,
+                                    cursor: "pointer",
+                                  },
+                                  pressed: { outline: "none" },
+                                }}
+                              />
+                            );
+                          },
+                        )
                       }
                     </Geographies>
                     {MARITIMES_MARKERS.map(({ city, coords }) => (
                       <Marker key={city} coordinates={coords}>
-                        <circle r={2.5} fill="#ffffff" fillOpacity={0.95} stroke="#0d1117" strokeWidth={0.6} />
+                        <circle
+                          r={2.5}
+                          fill="#ffffff"
+                          fillOpacity={0.95}
+                          stroke="#0d1117"
+                          strokeWidth={0.6}
+                        />
                       </Marker>
                     ))}
                   </ComposableMap>
@@ -968,22 +1134,41 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
 
   return (
     <div className="w-full flex-1 bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-xl flex flex-col justify-center">
-      {(!chartData.data || chartData.data.length === 0) && chartData.message && (
-        <div className="flex flex-col items-center justify-center gap-2 py-8">
-          <p className="text-gray-300 text-sm text-center max-w-md">
-            {chartData.message}
-          </p>
-        </div>
-      )}
-      {!chartData.message && chartData.chartConfig.chartType === "pie" && renderPieOrDonut(chartData.data ?? [], false)}
-      {!chartData.message && chartData.chartConfig.chartType === "donut" && renderPieOrDonut(chartData.data ?? [], true)}
-      {!chartData.message && chartData.chartConfig.chartType === "bar" && renderBar(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "treemap" && renderTreemap(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "line" && renderLine(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "stat" && renderStat(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "grid" && renderGrid(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "heatmap" && renderHeatmap(chartData.data ?? [])}
-      {!chartData.message && chartData.chartConfig.chartType === "map" && renderMap(chartData.data ?? [])}
+      {(!chartData.data || chartData.data.length === 0) &&
+        chartData.message && (
+          <div className="flex flex-col items-center justify-center gap-2 py-8">
+            <p className="text-gray-300 text-sm text-center max-w-md">
+              {chartData.message}
+            </p>
+          </div>
+        )}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "pie" &&
+        renderPieOrDonut(chartData.data ?? [], false)}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "donut" &&
+        renderPieOrDonut(chartData.data ?? [], true)}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "bar" &&
+        renderBar(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "treemap" &&
+        renderTreemap(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "line" &&
+        renderLine(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "stat" &&
+        renderStat(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "grid" &&
+        renderGrid(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "heatmap" &&
+        renderHeatmap(chartData.data ?? [])}
+      {!chartData.message &&
+        chartData.chartConfig.chartType === "map" &&
+        renderMap(chartData.data ?? [])}
     </div>
   );
 });
@@ -1055,9 +1240,10 @@ export default function App() {
 
       // Push browser URL straight to the dashboard metrics page on login success
       // After login, return to the page the user was on (handles /share/:id correctly)
-      const returnTo = window.location.pathname !== "/"
-        ? window.location.pathname
-        : "/dashboard";
+      const returnTo =
+        window.location.pathname !== "/"
+          ? window.location.pathname
+          : "/dashboard";
       window.location.href = returnTo;
 
       // 🧹 4. Complete secure field lifecycle cleanup to optimize memory bounds
@@ -1171,23 +1357,48 @@ export default function App() {
   if (!token) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
-          <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl px-10 py-8 shadow-2xl flex flex-col items-center">          <div className="mb-6 text-center flex flex-col items-center gap-2">
-            <svg width="200" height="55" viewBox="0 0 160 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <text x="0" y="30" fontFamily="Georgia, 'Times New Roman', serif" fontSize="35" fill="#6abf70" fontWeight="600" letterSpacing="-0.5">elio</text>
-              <text x="66" y="30" fontFamily="'Arial Black', Arial, sans-serif" fontSize="45" fill="#ffffff" fontWeight="900">Tax</text>
+        <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl px-10 py-8 shadow-2xl flex flex-col items-center">
+          {" "}
+          <div className="mb-6 text-center flex flex-col items-center gap-2">
+            <svg
+              width="200"
+              height="55"
+              viewBox="0 0 160 44"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <text
+                x="0"
+                y="30"
+                fontFamily="Georgia, 'Times New Roman', serif"
+                fontSize="35"
+                fill="#6abf70"
+                fontWeight="600"
+                letterSpacing="-0.5"
+              >
+                elio
+              </text>
+              <text
+                x="66"
+                y="30"
+                fontFamily="'Arial Black', Arial, sans-serif"
+                fontSize="45"
+                fill="#ffffff"
+                fontWeight="900"
+              >
+                Tax
+              </text>
             </svg>
             <p className="text-gray-200 text-xs font-mono tracking-widest uppercase">
               Intelligent Analytics and Visualization Hub
             </p>
           </div>
-
           {authError && (
             <div className="w-full bg-red-900/30 border border-red-700/50 text-red-200 p-3 rounded-lg text-sm mb-4 text-center">
               ⚠️ {authError}
             </div>
           )}
-
-        <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
+          <form onSubmit={handleLogin} className="w-full max-w-sm space-y-4">
             <div>
               <label className="block text-xs font-mono uppercase text-gray-300 mb-1.5">
                 Corporate Email
@@ -1225,7 +1436,10 @@ export default function App() {
       </div>
     );
   }
-  if (userRole === 'viewer' && !window.location.pathname.startsWith('/share/')) {
+  if (
+    userRole === "viewer" &&
+    !window.location.pathname.startsWith("/share/")
+  ) {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-xl p-8 shadow-2xl flex flex-col items-center gap-6 text-center">
@@ -1233,9 +1447,12 @@ export default function App() {
             🔗
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white mb-2">Share Link Required</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Share Link Required
+            </h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Your account has viewer access. You can only view dashboards that have been shared with you directly via a link.
+              Your account has viewer access. You can only view dashboards that
+              have been shared with you directly via a link.
             </p>
             <p className="text-gray-500 text-xs mt-3 font-mono">
               Ask an analyst or admin to share a dashboard link with you.
@@ -1252,9 +1469,11 @@ export default function App() {
     );
   }
   const nlAssistantPage = (
-  <div className="h-full bg-gray-900 text-gray-100 flex flex-col px-6 pb-4 pt-2 overflow-auto">      
-  <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col items-center pt-4 pb-4">       
-  <h1 className="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">          Elio Tax AI Assistant
+    <div className="h-full bg-gray-900 text-gray-100 flex flex-col px-6 pb-4 pt-2 overflow-auto">
+      <main className="flex-1 max-w-4xl w-full mx-auto flex flex-col items-center pt-4 pb-4">
+        <h1 className="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+          {" "}
+          Elio Tax AI Assistant
         </h1>
 
         {isRestricted && (
@@ -1265,7 +1484,7 @@ export default function App() {
           </div>
         )}
 
-      <form onSubmit={handleSearch} className="w-full flex gap-3 mb-4">
+        <form onSubmit={handleSearch} className="w-full flex gap-3 mb-4">
           <input
             type="text"
             value={query}
@@ -1287,7 +1506,9 @@ export default function App() {
           </button>
         </form>
 
-        <div className="w-full flex-1 min-h-[320px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">          {isLoading && (
+        <div className="w-full flex-1 min-h-[320px] bg-gray-800 border border-gray-700 rounded-xl p-6 flex flex-col justify-center items-center">
+          {" "}
+          {isLoading && (
             <div className="animate-spin w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full" />
           )}
           {error && !isLoading && (
@@ -1302,7 +1523,6 @@ export default function App() {
                 : "Enter an AI prompt to trigger data engine..."}
             </p>
           )}
-
           {!isLoading && !error && chartData && (
             <div className="w-full flex-1 flex flex-col gap-3">
               <div className="relative flex items-center justify-center">
@@ -1379,15 +1599,51 @@ export default function App() {
 
   return (
     <Routes>
+      {/* 1. Public Share Route */}
       <Route path="/share/:id" element={<SharedDashboardView />} />
+
+      {/* 2. Main Application Routes */}
       <Route
         path="/*"
         element={
-          <DashboardLayout navItems={navItems} userRole={userRole} onLogout={handleLogout}><Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard canShare={userRole === "analyst" || userRole === "admin"} />} />
+          <DashboardLayout
+            navItems={navItems}
+            userRole={userRole}
+            onLogout={handleLogout}
+          >
+            <Routes>
+              {/* CHANGE HERE: Instead of redirecting, render the Dashboard component directly on the "/" path */}
+              <Route
+                path="/"
+                element={
+                  <Dashboard
+                    canShare={userRole === "analyst" || userRole === "admin"}
+                  />
+                }
+              />
+
+              {/* Keeps /dashboard explicitly working as well */}
+              <Route
+                path="/dashboard"
+                element={
+                  <Dashboard
+                    canShare={userRole === "analyst" || userRole === "admin"}
+                  />
+                }
+              />
+
               <Route path="/assistant" element={nlAssistantPage} />
-              <Route path="/admin" element={userRole === "admin" ? <AdminPanel /> : <Navigate to="/dashboard" replace />} /></Routes>
+              <Route
+                path="/admin"
+                element={
+                  userRole === "admin" ? (
+                    <AdminPanel />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+            </Routes>
           </DashboardLayout>
         }
       />
