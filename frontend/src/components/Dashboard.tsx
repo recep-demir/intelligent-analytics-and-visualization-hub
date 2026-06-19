@@ -489,7 +489,7 @@ export function Dashboard({
       {/* Province Map */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 w-full">
         <p className="text-sm font-medium text-gray-400 mb-3">
-          Orders by Province
+          Revenue by Province
         </p>
 
         <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700">
