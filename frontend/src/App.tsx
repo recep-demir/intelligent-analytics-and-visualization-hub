@@ -364,7 +364,6 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         };
       });
 
-      const height = Math.max(labels.length * 72 + 24, 200);
       const options = {
         indexAxis: "y" as const,
         responsive: true,
