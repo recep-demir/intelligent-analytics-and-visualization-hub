@@ -295,8 +295,8 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
     };
     return (
-      <div className="flex items-center gap-10 py-4 w-full justify-center">
-        <div className="relative shrink-0" style={{ width: 200, height: 200 }}>
+      <div className="flex flex-col md:flex-row items-center gap-6 py-4 w-full justify-center">
+        <div className="relative shrink-0 w-48 h-48">
           {isDonut ? (
             <Doughnut data={data} options={options} />
           ) : (
@@ -310,7 +310,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
             </div>
           )}
         </div>
-        <div className="space-y-2.5 min-w-[220px]">
+        <div className="space-y-2.5 min-w-0 w-full md:w-auto md:min-w-[220px]">
           {records.map((record: any, i: number) => (
             <div key={i} className="flex items-center gap-3">
               <span
@@ -399,7 +399,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         },
       };
       return (
-        <div style={{ height }}>
+        <div className="relative w-full h-64 md:h-80">
           <Bar
             data={{ labels, datasets }}
             options={options}
@@ -410,7 +410,6 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     }
 
     // Single-metric bar (existing behaviour)
-    const height = Math.max(records.length * 48 + 24, 200);
     const data = {
       labels: records.map((r: any) => r.name ?? r.label ?? ""),
       datasets: [
@@ -453,7 +452,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
     };
     return (
-      <div style={{ height }}>
+      <div className="relative w-full h-64 md:h-80">
         <Bar data={data} options={options} plugins={[ChartDataLabels]} />
       </div>
     );
@@ -512,7 +511,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         },
       };
       return (
-        <div style={{ height: 288 }}>
+        <div className="relative w-full h-64 md:h-80">
           <Line data={{ labels: timeLabels, datasets }} options={options} />
         </div>
       );
@@ -565,7 +564,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
         },
       };
       return (
-        <div style={{ height: 288 }}>
+        <div className="relative w-full h-64 md:h-80">
           <Line data={data} options={options} />
         </div>
       );
@@ -613,7 +612,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
     };
 
     return (
-      <div style={{ height: 288 }}>
+      <div className="relative w-full h-64 md:h-80">
         <Line data={data} options={options} />
       </div>
     );
@@ -770,7 +769,7 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
     };
     return (
-      <div className="w-full" style={{ height: 380 }}>
+      <div className="relative w-full h-80 md:h-96">
         <Chart type="treemap" data={data as any} options={options as any} />
       </div>
     );
@@ -890,14 +889,14 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
       },
     };
 
-    const height = Math.max(dim1Values.length * 40 + 60, 200);
-
     return (
-      <div className="flex gap-4 w-full">
-        <div className="flex-1" style={{ height }}>
-          <Chart type="matrix" data={data as any} options={options as any} />
+      <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700">
+        <div className="flex gap-4 min-w-[500px]">
+          <div className="relative flex-1 h-64 md:h-80">
+            <Chart type="matrix" data={data as any} options={options as any} />
+          </div>
+          <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
         </div>
-        <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
       </div>
     );
   }
@@ -921,7 +920,8 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
             </span>
           )}
         </div>
-        <div className="flex items-stretch gap-4">
+        <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700">
+        <div className="flex items-stretch gap-4 min-w-[650px]">
           <div className="flex-1 relative">
             <div className="rounded-xl border border-gray-800/60 bg-[#0d1117]">
               <ComposableMap
@@ -1128,12 +1128,13 @@ const ChartView = React.memo(function ChartView({ chartData }: ChartViewProps) {
           </div>
           <VerticalLegend minV={minV} maxV={maxV} agg={agg} />
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full flex-1 bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-xl flex flex-col justify-center">
+    <div className="w-full flex-1 bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-xl flex flex-col justify-center overflow-hidden">
       {(!chartData.data || chartData.data.length === 0) &&
         chartData.message && (
           <div className="flex flex-col items-center justify-center gap-2 py-8">
@@ -1551,7 +1552,7 @@ export default function App() {
                       : "text-white-1000";
                   return (
                     <span
-                      className={`absolute right-0 text-sm font-mono font-mono ${color}`}
+                      className={`absolute right-0 text-sm font-mono font-mono hidden sm:inline ${color}`}
                     >
                       {label}
                       {latency ? ` · ${latency}` : ""}
