@@ -7,7 +7,10 @@ import { expressMiddleware } from "@as-integrations/express4";
 import { sequelize, Product } from "./models";
 import { generateSchema } from "graphql-gene";
 import { print } from "graphql";
-import { requireAdminOrAnalystJWT } from "./src/auth/rbacMiddleware";
+import {
+  requireAdminJWT,
+  requireAdminOrAnalystJWT,
+} from "./src/auth/rbacMiddleware";
 import { chartRouter, sharedChartRouter } from "./src/charts/chartRoutes";
 import { AIAdapter } from "./src/ai/adapter";
 import { GeminiEngine } from "./src/ai/engines/gemini";
@@ -116,6 +119,14 @@ export async function startServer(): Promise<void> {
 
     // Insights are deterministic for the same question — cache them in memory
     const insightsCache = new Map<string, string[]>();
+    app.delete("/api/cache", requireAdminJWT, (_req, res) => {
+      adapter.clearCache();
+      insightsCache.clear();
+
+      return res.status(200).json({
+        message: "AI query cache cleared",
+      });
+    });
 
     app.post("/api/ai/query", requireAdminOrAnalystJWT, async (req, res) => {
       try {
