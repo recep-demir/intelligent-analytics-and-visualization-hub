@@ -1,5 +1,21 @@
 # 📊 Elio Tax Analytics and Visualisation Hub
 
+> Portfolio note: This project was developed as a 6 person team project during the Powercoders bootcamp.  
+> My role was Backend Developer & AI Engineer.  
+> This fork is kept in my personal GitHub profile to showcase my own contributions and the overall project experience.
+
+> ## My Contributions
+>
+> - Built backend services with Node.js, TypeScript and Express
+> - Integrated GraphQL with SQLite
+> - Implemented the AI query endpoint
+> - Worked on the AI adapter and local engine logic
+> - Added JWT authentication and RBAC middleware
+> - Implemented admin user routes
+> - Added aggregation logic for analytics dashboard data
+> - Added backend tests with Jest
+> - Collaborated through GitHub pull requests, reviews and team discussions
+
 An intelligent analytics sandbox dashboard built for **Elio Tax** during the **PowerCoders** program.
 
 ## 📝 Project Overview
